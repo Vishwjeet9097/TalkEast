@@ -33,6 +33,7 @@ export default function PracticeHub({ profile }: Props) {
     const [sessionCompleted, setSessionCompleted] = useState(false);
     const [sessionScore, setSessionScore] = useState(0);
     const [correctCount, setCorrectCount] = useState(0);
+    const [sessionStartTime, setSessionStartTime] = useState(0);
     
     // Session State
     const [items, setItems] = useState<PracticeItem[]>([]);
@@ -42,6 +43,7 @@ export default function PracticeHub({ profile }: Props) {
     const [feedback, setFeedback] = useState<'idle' | 'correct' | 'incorrect'>('idle');
     const [aiExplanation, setAiExplanation] = useState<string | null>(null);
     const [isExplaining, setIsExplaining] = useState(false);
+    const [useLocalContent, setUseLocalContent] = useState(true); // Track if user wants to use local content
 
     const { speak, state: audioState, currentText: playingText } = useTTS();
 
@@ -149,11 +151,11 @@ export default function PracticeHub({ profile }: Props) {
         return options.slice(0, 4); // Ensure exactly 4 options
     };
 
-    const startPractice = async (type: PracticeType, fromCourse?: Course) => {
+    const startPractice = async (type: PracticeType, fromCourse?: Course, forceAI: boolean = false) => {
         if (!profile) return;
 
-        // Check if we should ask for course selection
-        if (hasCourseContent() && !fromCourse) {
+        // Check if we should ask for course selection (only if local content exists and not forcing AI)
+        if (hasCourseContent() && !fromCourse && !forceAI && useLocalContent) {
             setShowCourseSelection(true);
             setActiveMode(type);
             return;
@@ -175,33 +177,74 @@ export default function PracticeHub({ profile }: Props) {
         try {
             let generatedItems: PracticeItem[] = [];
 
-            if (fromCourse && type === 'vocab') {
-                // Use course vocabulary
-                const allWords: VocabWord[] = [];
-                fromCourse.chapters.forEach(ch => {
-                    allWords.push(...ch.vocab.filter(w => w.meaning && w.meaning.trim())); // Filter out empty meanings
-                });
-                
-                if (allWords.length > 0) {
-                    const shuffled = [...allWords].sort(() => Math.random() - 0.5);
-                    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
-                    generatedItems = selected.map((word, idx) => {
-                        const distractors = generateDistractors(word.meaning, allWords);
-                        return {
-                            id: `course-${idx}`,
-                            type: 'vocab' as PracticeType,
-                            question: `What does "${word.original}" mean?`,
-                            correctAnswer: word.meaning,
-                            possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'], // Ensure 4 options
-                            audioText: word.original,
-                            explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
-                        };
+            // Priority 1: Use local content if course is provided and not forcing AI
+            if (fromCourse && !forceAI) {
+                if (type === 'vocab') {
+                    // Use course vocabulary
+                    const allWords: VocabWord[] = [];
+                    fromCourse.chapters.forEach(ch => {
+                        allWords.push(...ch.vocab.filter(w => w.meaning && w.meaning.trim())); // Filter out empty meanings
                     });
+                    
+                    if (allWords.length > 0) {
+                        const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+                        const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+                        generatedItems = selected.map((word, idx) => {
+                            const distractors = generateDistractors(word.meaning, allWords);
+                            return {
+                                id: `course-${idx}`,
+                                type: 'vocab' as PracticeType,
+                                question: `What does "${word.original}" mean?`,
+                                correctAnswer: word.meaning,
+                                possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'], // Ensure 4 options
+                                audioText: word.original,
+                                explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+                            };
+                        });
+                    }
+                } else {
+                    // For grammar, listening, reading - try to extract from course content
+                    const allWords: VocabWord[] = [];
+                    fromCourse.chapters.forEach(ch => {
+                        allWords.push(...ch.vocab.filter(w => w.meaning && w.meaning.trim()));
+                    });
+                    
+                    // If we have enough content, create practice items from it
+                    if (allWords.length >= 5) {
+                        const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+                        const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+                        
+                        if (type === 'grammar') {
+                            // Create grammar questions from course content
+                            generatedItems = selected.map((word, idx) => ({
+                                id: `course-grammar-${idx}`,
+                                type: 'grammar' as PracticeType,
+                                question: `Complete: "${word.exampleSentence?.replace(word.original, '___') || `Use "${word.original}" in a sentence`}"`,
+                                correctAnswer: word.original,
+                                possibleAnswers: [
+                                    word.original,
+                                    ...shuffled.filter(w => w.original !== word.original).slice(0, 3).map(w => w.original)
+                                ].sort(() => Math.random() - 0.5).slice(0, 4),
+                                audioText: word.exampleSentence || word.original,
+                                explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+                            }));
+                        } else if (type === 'listening' || type === 'reading') {
+                            // Create listening/reading questions from course content
+                            generatedItems = selected.map((word, idx) => ({
+                                id: `course-${type}-${idx}`,
+                                type: type,
+                                question: type === 'listening' ? "Type what you hear" : `What does "${word.original}" mean?`,
+                                correctAnswer: type === 'listening' ? word.original : word.meaning,
+                                audioText: word.original,
+                                explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+                            }));
+                        }
+                    }
                 }
             }
 
-            // If no course content or not vocab, use AI
-            if (generatedItems.length === 0) {
+            // Priority 2: Use AI only if no local content was generated OR if explicitly forced
+            if (generatedItems.length === 0 || forceAI) {
                 const context = fromCourse 
                     ? fromCourse.title 
                     : courses.length > 0 
@@ -217,10 +260,14 @@ export default function PracticeHub({ profile }: Props) {
                 );
             }
 
+            if (generatedItems.length === 0) {
+                throw new Error("No practice items could be generated. Please ensure you have content or check your API key.");
+            }
+
             setItems(generatedItems);
         } catch (e) {
             console.error(e);
-            alert("Failed to start practice session.");
+            alert("Failed to start practice session. " + (e instanceof Error ? e.message : "Please try again."));
             setActiveMode(null);
         } finally {
             setIsLoading(false);
@@ -357,6 +404,8 @@ export default function PracticeHub({ profile }: Props) {
         setCorrectCount(0);
         setSessionScore(0);
         setIsDailyReview(false);
+        setSessionStartTime(0);
+        setSelectedCourse(null);
     };
 
     // Congratulation Card
@@ -493,7 +542,8 @@ export default function PracticeHub({ profile }: Props) {
                                     onClick={() => {
                                         setSelectedCourse(course);
                                         setShowCourseSelection(false);
-                                        startPractice(activeMode, course);
+                                        setUseLocalContent(true); // User chose local content
+                                        startPractice(activeMode, course, false); // Use local content, don't force AI
                                     }}
                                     className="w-full text-left p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
                                 >
@@ -519,7 +569,8 @@ export default function PracticeHub({ profile }: Props) {
                     <button
                         onClick={() => {
                             setShowCourseSelection(false);
-                            startPractice(activeMode);
+                            setUseLocalContent(false); // User explicitly chose AI
+                            startPractice(activeMode, undefined, true); // Force AI generation
                         }}
                         className="w-full p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all flex items-center justify-center gap-2"
                     >

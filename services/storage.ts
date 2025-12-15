@@ -6,23 +6,53 @@ const DB_VERSION = 4; // Incremented for new stores (practiceHistory)
 
 export class StorageService {
   private db: IDBDatabase | null = null;
+  private initPromise: Promise<void> | null = null;
 
   async init(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+    // If already initialized, return
+    if (this.db) return Promise.resolve();
+    // If initialization is in progress, return the existing promise
+    if (this.initPromise) return this.initPromise;
+    
+    // Check if IndexedDB is available
+    if (!window.indexedDB) {
+      throw new Error('IndexedDB is not supported in this browser. Please use a modern browser.');
+    }
+    
+    // Start initialization
+    this.initPromise = new Promise((resolve, reject) => {
+      try {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => reject('Error opening database');
+        request.onerror = (event) => {
+          this.initPromise = null; // Clear promise on error
+          const error = (event.target as IDBOpenDBRequest).error;
+          console.error('IndexedDB open error:', error);
+          reject(new Error(`Database error: ${error?.message || 'Failed to open database'}`));
+        };
 
-      request.onsuccess = async (event) => {
-        this.db = (event.target as IDBOpenDBRequest).result;
-        // Check if we need to seed data
-        await this.checkAndSeedData();
-        resolve();
-      };
+        request.onsuccess = async (event) => {
+          try {
+            this.db = (event.target as IDBOpenDBRequest).result;
+            // Check if we need to seed data
+            await this.checkAndSeedData();
+            this.initPromise = null; // Clear promise after successful init
+            resolve();
+          } catch (seedError: any) {
+            this.initPromise = null;
+            console.error('Error during database initialization:', seedError);
+            reject(new Error(`Database initialization failed: ${seedError.message || 'Unknown error'}`));
+          }
+        };
 
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        const tx = (event.target as IDBOpenDBRequest).transaction;
+        request.onupgradeneeded = (event) => {
+          try {
+            const db = (event.target as IDBOpenDBRequest).result;
+            const tx = (event.target as IDBOpenDBRequest).transaction;
+            
+            if (!tx) {
+              throw new Error('Transaction not available during upgrade');
+            }
 
         if (!db.objectStoreNames.contains('userProfile')) {
           db.createObjectStore('userProfile', { keyPath: 'id' });
@@ -55,8 +85,18 @@ export class StorageService {
             store.createIndex('date', 'date', { unique: false });
             store.createIndex('timestamp', 'timestamp', { unique: false });
         }
-      };
+          } catch (upgradeError: any) {
+            console.error('Error during database upgrade:', upgradeError);
+            reject(new Error(`Database upgrade failed: ${upgradeError.message || 'Unknown error'}`));
+          }
+        };
+      } catch (initError: any) {
+        this.initPromise = null;
+        reject(new Error(`Failed to initialize database: ${initError.message || 'Unknown error'}`));
+      }
     });
+    
+    return this.initPromise;
   }
 
   private async checkAndSeedData() {
@@ -178,6 +218,17 @@ export class StorageService {
 
   async getNotes(): Promise<Note[]> {
     return this.getAll('notes') as Promise<Note[]>;
+  }
+
+  async deleteNote(noteId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject('DB not initialized');
+      const tx = this.db.transaction('notes', 'readwrite');
+      const store = tx.objectStore('notes');
+      const req = store.delete(noteId);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
   }
 
   // --- USER STATS ---

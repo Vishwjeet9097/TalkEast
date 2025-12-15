@@ -23,10 +23,14 @@ import AskWithAI from './components/AskWithAI';
 import FloatingAIWidget from './components/FloatingAIWidget';
 import AppHeader from './components/AppHeader';
 import AppFooter from './components/AppFooter';
+import ErrorBoundary from './components/ErrorBoundary';
+import ErrorDisplay from './components/ErrorDisplay';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [error, setError] = useState<Error | string | null>(null);
+  const [initError, setInitError] = useState<Error | null>(null);
 
   const normalizeProfile = (p: UserProfile | null): UserProfile | null => {
     if (!p) return null;
@@ -34,45 +38,99 @@ export default function App() {
   };
 
   useEffect(() => {
-    const initApp = async () => {
-      await db.init();
-      const user = await db.getProfile();
-      const normalized = normalizeProfile(user);
-      if (normalized && normalized.useEnvKey === undefined) {
-        normalized.useEnvKey = true;
+    // Global error handlers
+    const handleError = (event: ErrorEvent) => {
+      console.error('Global error:', event.error);
+      const errorMessage = event.error?.message || event.message || 'An unexpected error occurred';
+      
+      // Check if it's a storage error
+      if (errorMessage.includes('storage') || errorMessage.includes('IndexedDB') || errorMessage.includes('DB not initialized')) {
+        setError('Database initialization failed. Please refresh the page.');
+        return;
       }
-      setProfile(normalized);
-      setLoading(false);
-      NotificationService.requestPermission();
       
-      // System-first theme detection
-      const applyTheme = (themePref: 'light' | 'dark' | 'system' | undefined) => {
-        let shouldBeDark = false;
-        
-        if (themePref === 'system' || !themePref) {
-          const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          shouldBeDark = systemPrefersDark;
-        } else {
-          shouldBeDark = themePref === 'dark';
-        }
-        
-        document.documentElement.classList.toggle('dark', shouldBeDark);
-      };
-      
-      applyTheme(normalized?.theme);
-      
-      // Listen for system theme changes
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleThemeChange = (e: MediaQueryListEvent) => {
-        if (!normalized?.theme || normalized.theme === 'system') {
-          applyTheme('system');
-        }
-      };
-      mediaQuery.addEventListener('change', handleThemeChange);
-      
-      return () => mediaQuery.removeEventListener('change', handleThemeChange);
+      setError(errorMessage);
     };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      const errorMessage = event.reason?.message || String(event.reason) || 'An unexpected error occurred';
+      
+      // Check if it's a storage error
+      if (errorMessage.includes('storage') || errorMessage.includes('IndexedDB') || errorMessage.includes('DB not initialized') || errorMessage.includes('Access to storage')) {
+        setError('Database access error. Please refresh the page.');
+        return;
+      }
+      
+      setError(errorMessage);
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    const initApp = async () => {
+      try {
+        setInitError(null);
+        await db.init();
+        const user = await db.getProfile();
+        const normalized = normalizeProfile(user);
+        if (normalized && normalized.useEnvKey === undefined) {
+          normalized.useEnvKey = true;
+        }
+        setProfile(normalized);
+        setLoading(false);
+        
+        try {
+          NotificationService.requestPermission();
+        } catch (notifError) {
+          console.warn('Notification permission error:', notifError);
+        }
+        
+        // System-first theme detection
+        const applyTheme = (themePref: 'light' | 'dark' | 'system' | undefined) => {
+          let shouldBeDark = false;
+          
+          if (themePref === 'system' || !themePref) {
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            shouldBeDark = systemPrefersDark;
+          } else {
+            shouldBeDark = themePref === 'dark';
+          }
+          
+          document.documentElement.classList.toggle('dark', shouldBeDark);
+        };
+        
+        applyTheme(normalized?.theme);
+        
+        // Listen for system theme changes
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleThemeChange = (e: MediaQueryListEvent) => {
+          if (!normalized?.theme || normalized.theme === 'system') {
+            applyTheme('system');
+          }
+        };
+        mediaQuery.addEventListener('change', handleThemeChange);
+        
+        return () => mediaQuery.removeEventListener('change', handleThemeChange);
+      } catch (err: any) {
+        console.error('App initialization error:', err);
+        setInitError(err);
+        setLoading(false);
+        const errorMessage = err?.message || 'Failed to initialize application';
+        if (errorMessage.includes('storage') || errorMessage.includes('IndexedDB') || errorMessage.includes('DB not initialized')) {
+          setError('Database initialization failed. Please refresh the page or check your browser settings.');
+        } else {
+          setError(errorMessage);
+        }
+      }
+    };
+    
     initApp();
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, []);
 
   const handleProfileUpdate = async (newProfile: UserProfile) => {
@@ -88,6 +146,46 @@ export default function App() {
       : normalized.theme === 'dark';
     document.documentElement.classList.toggle('dark', shouldBeDark);
   };
+
+  // Show initialization error screen
+  if (initError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+        <div className="max-w-2xl w-full glass-panel rounded-3xl p-8 md:p-12 shadow-2xl border border-white/60 dark:border-slate-700 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl"></div>
+          <div className="relative z-10 text-center">
+            <div className="w-24 h-24 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-red-500/30">
+              <AlertTriangle size={48} className="text-white" />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-3">
+              Initialization Error
+            </h1>
+            <p className="text-slate-600 dark:text-slate-300 mb-6 text-lg">
+              {initError.message || 'Failed to initialize the application'}
+            </p>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6 text-left">
+              <p className="text-sm text-red-700 dark:text-red-400">
+                This might be due to browser storage restrictions. Please:
+              </p>
+              <ul className="text-sm text-red-600 dark:text-red-400 mt-2 list-disc list-inside space-y-1">
+                <li>Check if your browser allows storage access</li>
+                <li>Try using a different browser</li>
+                <li>Clear browser cache and reload</li>
+                <li>Check if you're in a private/incognito mode</li>
+              </ul>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:scale-105 transition-all flex items-center gap-2 mx-auto"
+            >
+              <RefreshCw size={20} />
+              Reload Application
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -106,14 +204,27 @@ export default function App() {
   }
 
   return (
-    <ProcessingProvider>
-      <HashRouter>
-        <div className="min-h-screen relative selection:bg-indigo-500/30 overflow-x-hidden">
-          {/* Dynamic Background */}
-          <div className="mesh-bg light-mesh dark:hidden"></div>
-          <div className="mesh-bg hidden dark:block bg-slate-900"></div>
-          
-          <GlobalStatus />
+    <ErrorBoundary>
+      <ProcessingProvider>
+        <HashRouter>
+          <div className="min-h-screen relative selection:bg-indigo-500/30 overflow-x-hidden">
+            {/* Global Error Display */}
+            {error && (
+              <ErrorDisplay 
+                error={error} 
+                onDismiss={() => setError(null)}
+                onRetry={() => {
+                  setError(null);
+                  window.location.reload();
+                }}
+              />
+            )}
+            
+            {/* Dynamic Background */}
+            <div className="mesh-bg light-mesh dark:hidden"></div>
+            <div className="mesh-bg hidden dark:block bg-slate-900"></div>
+            
+            <GlobalStatus />
 
           {/* App Header - Fixed at top */}
           {profile?.onboardingComplete && (
@@ -190,6 +301,7 @@ export default function App() {
         </div>
       </HashRouter>
     </ProcessingProvider>
+    </ErrorBoundary>
   );
 }
 

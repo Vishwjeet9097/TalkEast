@@ -104,6 +104,9 @@ export interface Note {
   content: string; // HTML/Rich Text
   createdAt: number;
   tags: string[];
+  pinned?: boolean;
+  color?: string; // Hex color code or color name
+  order?: number; // For custom ordering
 }
 
 export interface FlashcardSet {
