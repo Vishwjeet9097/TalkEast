@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'r
 import { db } from './services/storage';
 import { NotificationService } from './services/notifications';
 import { UserProfile, Language } from './types';
-import { BookOpen, Mic, PenTool, Layout, Settings, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit } from 'lucide-react';
+import { BookOpen, Mic, PenTool, Layout, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit, Sun, Moon } from 'lucide-react';
 import { ProcessingProvider } from './context/ProcessingContext';
 import GlobalStatus from './components/GlobalStatus';
 
@@ -185,6 +185,8 @@ const MainLayout = ({
   onUpdateProfile?: (p: UserProfile) => void 
 }) => {
     const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+    const isDarkTheme = profile?.theme === 'dark';
+    const ThemeIcon = isDarkTheme ? Moon : Sun;
 
     const switchLanguage = (lang: Language) => {
         if (profile && onUpdateProfile) {
@@ -217,9 +219,9 @@ const MainLayout = ({
                  <div className="flex items-center gap-3">
                      <button
                         onClick={toggleTheme}
-                        className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-colors"
+                        className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-amber-300 transition-colors"
                      >
-                        <Settings size={18} />
+                        <ThemeIcon size={18} />
                      </button>
 
                      <div className="relative">
