@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../services/storage';
 import { transcribeAudio } from '../services/gemini';
 import { Note, UserProfile } from '../types';
-import { Plus, Trash2, Edit3, Bold, Italic, Mic, Loader2, StopCircle, List, Tag, X, Filter, ChevronLeft, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Edit3, Bold, Italic, Mic, Loader2, StopCircle, List, Tag, X, Filter, ChevronLeft, AlertTriangle, Check } from 'lucide-react';
 
 export default function NotesView({ profile }: { profile: UserProfile | null }) {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -196,6 +196,10 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
   // Tag Helpers
   const addTag = () => {
     if (tagInput.trim() && activeNote) {
+      // Check if already has 2 tags
+      if (activeNote.tags && activeNote.tags.length >= 2) {
+        return;
+      }
       const newTag = tagInput.trim();
       if (!activeNote.tags.includes(newTag)) {
         setActiveNote({
@@ -289,21 +293,29 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                     className="flex-1 text-xl font-bold bg-transparent border-none outline-none placeholder-slate-400 text-slate-800 dark:text-slate-100"
                     placeholder="Note Title"
                   />
+                  <button 
+                    onClick={saveNote} 
+                    className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 flex items-center justify-center"
+                    title="Save"
+                  >
+                    <Check size={20} />
+                  </button>
               </div>
 
               {/* Tag Input Area */}
               <div className="flex flex-wrap items-center gap-2 mb-4">
-                <div className="flex items-center bg-white/40 dark:bg-slate-800/40 rounded-lg px-2 py-1 flex-1 max-w-xs border border-slate-200 dark:border-slate-700">
-                  <Tag size={14} className="text-slate-400 mr-2" />
+                <div className={`flex items-center bg-white/40 dark:bg-slate-800/40 rounded-lg px-2 py-1 flex-1 max-w-xs border border-slate-200 dark:border-slate-700 ${(activeNote.tags && activeNote.tags.length >= 2) ? 'opacity-50' : ''}`}>
+                  <Tag size={14} className={`mr-2 ${(activeNote.tags && activeNote.tags.length >= 2) ? 'text-slate-300 dark:text-slate-600' : 'text-slate-400'}`} />
                   <input 
                     type="text"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
-                    placeholder="Add tag..."
-                    className="bg-transparent border-none outline-none text-sm w-full text-slate-700 dark:text-slate-200 placeholder-slate-400"
+                    placeholder={(activeNote.tags && activeNote.tags.length >= 2) ? "Maximum 2 tags" : "Add tag..."}
+                    disabled={(activeNote.tags && activeNote.tags.length >= 2)}
+                    className="bg-transparent border-none outline-none text-sm w-full text-slate-700 dark:text-slate-200 placeholder-slate-400 disabled:cursor-not-allowed disabled:text-slate-400 dark:disabled:text-slate-600"
                   />
-                  {tagInput && (
+                  {tagInput && !(activeNote.tags && activeNote.tags.length >= 2) && (
                     <button onClick={addTag} className="ml-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
                       <Plus size={14} />
                     </button>
@@ -358,9 +370,6 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                     {isRecording ? <StopCircle size={18} /> : <Mic size={18} />}
                     {isRecording ? 'Recording...' : 'Dictate'}
                   </button>
-
-                  <div className="flex-1"></div>
-                  <button onClick={saveNote} className="text-indigo-600 dark:text-indigo-400 font-bold px-4 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-lg py-1 transition-colors">Done</button>
               </div>
 
               {/* Rich Text Editor */}

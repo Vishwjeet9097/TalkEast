@@ -25,6 +25,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   const [studySessionCompleted, setStudySessionCompleted] = useState(false);
   const [flashcardCorrectCount, setFlashcardCorrectCount] = useState(0);
   const [flashcardScore, setFlashcardScore] = useState(0);
+  const [isProcessingCard, setIsProcessingCard] = useState(false);
 
   // Dialogue Playback State
   const [activeDialogueType, setActiveDialogueType] = useState<'short' | 'long'>('short');
@@ -285,11 +286,17 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           setStudySessionCompleted(false);
           setFlashcardCorrectCount(0);
           setFlashcardScore(0);
+          setIsProcessingCard(false);
       }
   };
 
   const nextCard = (known: boolean) => {
+      // Prevent rapid clicks
+      if (isProcessingCard) return;
+      
+      setIsProcessingCard(true);
       setIsFlipped(false);
+      
       // Track correct answers (known = true means "Got it")
       if (known) {
           setFlashcardCorrectCount(prev => prev + 1);
@@ -297,11 +304,16 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       }
       
       setTimeout(() => {
-          if (currentCardIndex < currentVocabList.length - 1) {
-              setCurrentCardIndex(prev => prev + 1);
-          } else {
-              setStudySessionCompleted(true);
-          }
+          setCurrentCardIndex(prev => {
+              if (prev < currentVocabList.length - 1) {
+                  setIsProcessingCard(false);
+                  return prev + 1;
+              } else {
+                  setStudySessionCompleted(true);
+                  setIsProcessingCard(false);
+                  return prev;
+              }
+          });
       }, 200);
   };
 
@@ -314,56 +326,175 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   if (isStudyMode) {
       if (studySessionCompleted) {
           const accuracy = currentVocabList.length > 0 ? Math.round((flashcardCorrectCount / currentVocabList.length) * 100) : 0;
-          const motivationMessages = [
-              "Amazing work! You're building a strong foundation! 🎯",
-              "Outstanding! Every word you learn brings you closer to fluency! 🌟",
-              "Fantastic! Your dedication is paying off! Keep going! 💪",
-              "Excellent! You're mastering the language one word at a time! 🚀",
-              "Brilliant! Consistency is key, and you're nailing it! ⭐",
-              "Wonderful! Your progress is inspiring! Keep up the momentum! 🎉"
-          ];
+          
+          // Handle edge case: all cards marked as "Again" (0% accuracy)
+          const isPerfect = accuracy === 100;
+          const isAllAgain = accuracy === 0;
+          
+          // Motivation messages based on performance
+          const motivationMessages = isAllAgain 
+              ? [
+                  "Don't worry! Every mistake is a learning opportunity! 💪",
+                  "Keep practicing! You're building your foundation! 🌱",
+                  "Review helps! Try again and you'll remember better! 🔄",
+                  "Learning takes time! You've got this! ⭐",
+                  "Practice makes perfect! Let's try once more! 🎯"
+              ]
+              : isPerfect
+              ? [
+                  "Perfect score! You're a vocabulary master! 🏆",
+                  "Flawless! Outstanding performance! 🌟",
+                  "100%! You've mastered these words! 🎉",
+                  "Incredible! Perfect recall! ⭐",
+                  "Amazing! You know these words inside out! 🚀"
+              ]
+              : accuracy >= 80
+              ? [
+                  "Amazing work! You're building a strong foundation! 🎯",
+                  "Outstanding! Every word you learn brings you closer to fluency! 🌟",
+                  "Fantastic! Your dedication is paying off! Keep going! 💪",
+                  "Excellent! You're mastering the language one word at a time! 🚀",
+                  "Brilliant! Consistency is key, and you're nailing it! ⭐"
+              ]
+              : accuracy >= 50
+              ? [
+                  "Good progress! Keep practicing to improve! 📈",
+                  "You're getting there! Review helps retention! 🔄",
+                  "Nice work! Every word counts! 💪",
+                  "Keep going! Practice makes perfect! ⭐",
+                  "You're learning! That's what matters! 🌱"
+              ]
+              : [
+                  "Keep practicing! You're making progress! 💪",
+                  "Review helps! Try again to strengthen your memory! 🔄",
+                  "Learning takes time! You've got this! ⭐",
+                  "Every attempt makes you better! Keep going! 🌱",
+                  "Don't give up! Practice makes perfect! 🎯"
+              ];
+          
           const motivation = motivationMessages[Math.floor(Math.random() * motivationMessages.length)];
+          
+          // Achievement badges
+          const achievements = [];
+          if (isPerfect) {
+              achievements.push({ icon: "🏆", text: "Perfect Score", color: "from-yellow-400 to-orange-500" });
+          }
+          if (accuracy >= 80 && !isPerfect) {
+              achievements.push({ icon: "⭐", text: "Excellent", color: "from-purple-400 to-pink-500" });
+          }
+          if (currentVocabList.length >= 10) {
+              achievements.push({ icon: "📚", text: "10+ Words", color: "from-blue-400 to-indigo-500" });
+          }
+          if (flashcardScore >= 50) {
+              achievements.push({ icon: "💎", text: "High Score", color: "from-green-400 to-emerald-500" });
+          }
           
           return (
               <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full pt-6 pb-8 px-8 animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden">
+                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full p-8 animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden">
                       <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
                       
                       <div className="relative z-10 text-center">
-                          <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl shadow-yellow-500/30 animate-bounce">
-                              <Trophy size={40} className="text-white" />
+                          {/* Trophy Icon - Different color based on performance */}
+                          <div className={`w-24 h-24 bg-gradient-to-br ${isPerfect ? 'from-yellow-400 to-orange-500' : isAllAgain ? 'from-slate-400 to-slate-600' : 'from-indigo-400 to-purple-500'} rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl ${isPerfect ? 'shadow-yellow-500/30' : isAllAgain ? 'shadow-slate-500/30' : 'shadow-indigo-500/30'} ${!isAllAgain ? 'animate-bounce' : ''}`}>
+                              <Trophy size={48} className="text-white" />
                           </div>
                           
-                          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-1">Session Complete!</h2>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{motivation}</p>
+                          <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Session Complete!</h2>
+                          <p className="text-slate-500 dark:text-slate-400 mb-6">{motivation}</p>
                           
-                          <div className="grid grid-cols-3 gap-3 mb-5">
-                              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-3">
-                                  <div className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400">{flashcardCorrectCount}/{currentVocabList.length}</div>
-                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Correct</div>
+                          {/* Stats Grid */}
+                          <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4">
+                                  <div className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">{flashcardCorrectCount}/{currentVocabList.length}</div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Correct</div>
                               </div>
-                              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-3">
-                                  <div className="text-xl font-extrabold text-purple-600 dark:text-purple-400">{accuracy}%</div>
-                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Accuracy</div>
+                              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4">
+                                  <div className="text-2xl font-extrabold text-purple-600 dark:text-purple-400">{accuracy}%</div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Accuracy</div>
                               </div>
-                              <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3">
-                                  <div className="text-xl font-extrabold text-green-600 dark:text-green-400">+{flashcardScore}</div>
-                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Points</div>
+                              <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4">
+                                  <div className="text-2xl font-extrabold text-green-600 dark:text-green-400">+{flashcardScore}</div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Points</div>
                               </div>
                           </div>
                           
-                          <button 
-                              onClick={exitStudy} 
-                              className="w-full py-3.5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform text-sm"
-                          >
-                              Back to Lesson
-                          </button>
+                          {/* Achievements */}
+                          {achievements.length > 0 && (
+                              <div className="mb-6">
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Achievements</p>
+                                  <div className="flex flex-wrap justify-center gap-2">
+                                      {achievements.map((achievement, idx) => (
+                                          <div key={idx} className={`bg-gradient-to-br ${achievement.color} text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg`}>
+                                              <span>{achievement.icon}</span>
+                                              <span>{achievement.text}</span>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                          )}
+                          
+                          {/* Encouragement for 0% accuracy */}
+                          {isAllAgain && (
+                              <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-2xl p-4 mb-6 border border-orange-100 dark:border-orange-800">
+                                  <div className="flex items-center justify-center gap-2 mb-2">
+                                      <Star className="text-orange-500 fill-orange-500" size={20} />
+                                      <span className="font-bold text-slate-800 dark:text-white">Keep Learning!</span>
+                                  </div>
+                                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                                      Review these words and try again. Every attempt strengthens your memory! 💪
+                                  </p>
+                              </div>
+                          )}
+                          
+                          {/* Action Buttons */}
+                          <div className="flex gap-3">
+                              <button 
+                                  onClick={() => {
+                                      setIsStudyMode(false);
+                                      setStudySessionCompleted(false);
+                                      setCurrentCardIndex(0);
+                                      setIsFlipped(false);
+                                      setFlashcardCorrectCount(0);
+                                      setFlashcardScore(0);
+                                      startStudy();
+                                  }}
+                                  className="flex-1 py-4 bg-orange-600 text-white font-bold rounded-2xl shadow-lg shadow-orange-500/30 hover:scale-105 transition-transform"
+                              >
+                                  Retry
+                              </button>
+                              <button 
+                                  onClick={exitStudy} 
+                                  className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform"
+                              >
+                                  Continue Learning
+                              </button>
+                          </div>
                       </div>
                   </div>
               </div>
           );
       }
+      
+      // Safety check: ensure currentCard exists
       const currentCard = currentVocabList[currentCardIndex];
+      if (!currentCard) {
+          // If card doesn't exist, exit study mode
+          return (
+              <div className="fixed inset-0 z-[60] bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+                  <div className="text-center p-8">
+                      <p className="text-slate-500 dark:text-slate-400 mb-4">Session ended</p>
+                      <button 
+                          onClick={exitStudy} 
+                          className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors"
+                      >
+                          Back to Lesson
+                      </button>
+                  </div>
+              </div>
+          );
+      }
+      
       return (
           <div className="fixed inset-0 z-[60] bg-slate-50 dark:bg-slate-900 overflow-y-auto overscroll-contain">
               {/* Scrollable Content Container */}
@@ -459,18 +590,32 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       <div className="max-w-sm mx-auto flex justify-between items-center gap-3">
                           <button 
                               onClick={(e) => { e.stopPropagation(); nextCard(false); }} 
-                              className="flex-1 rounded-xl bg-orange-500/80 dark:bg-orange-600/80 backdrop-blur-lg border border-orange-300/50 dark:border-orange-400/30 shadow-lg shadow-orange-500/40 dark:shadow-orange-600/50 px-6 py-3 flex flex-row items-center justify-center gap-2 active:scale-95 transition-all hover:bg-orange-500/90 dark:hover:bg-orange-600/90 hover:shadow-xl hover:shadow-orange-500/50 dark:hover:shadow-orange-600/60 hover:scale-[1.02] relative overflow-hidden group"
+                              disabled={isProcessingCard}
+                              className="flex-1 rounded-xl bg-orange-500/80 dark:bg-orange-600/80 backdrop-blur-lg border border-orange-300/50 dark:border-orange-400/30 shadow-lg shadow-orange-500/40 dark:shadow-orange-600/50 px-6 py-3 flex flex-row items-center justify-center gap-2 active:scale-95 transition-all hover:bg-orange-500/90 dark:hover:bg-orange-600/90 hover:shadow-xl hover:shadow-orange-500/50 dark:hover:shadow-orange-600/60 hover:scale-[1.02] relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                           >
                               <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50"></div>
-                              <RotateCcw size={18} className="text-white relative z-10" strokeWidth={2.5} />
-                              <span className="text-sm font-bold text-white relative z-10">Again</span>
+                              {isProcessingCard ? (
+                                  <Loader2 size={18} className="text-white relative z-10 animate-spin" strokeWidth={2.5} />
+                              ) : (
+                                  <>
+                                      <RotateCcw size={18} className="text-white relative z-10" strokeWidth={2.5} />
+                                      <span className="text-sm font-bold text-white relative z-10">Again</span>
+                                  </>
+                              )}
                           </button>
                           <button 
                               onClick={(e) => { e.stopPropagation(); nextCard(true); }} 
-                              className="flex-1 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 px-6 py-3 flex flex-row items-center justify-center gap-2 active:scale-95 transition-all hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-500/50"
+                              disabled={isProcessingCard}
+                              className="flex-1 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 px-6 py-3 flex flex-row items-center justify-center gap-2 active:scale-95 transition-all hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                           >
-                              <Check size={18} className="text-white" strokeWidth={2.5} />
-                              <span className="text-sm font-bold text-white">Got it</span>
+                              {isProcessingCard ? (
+                                  <Loader2 size={18} className="text-white animate-spin" strokeWidth={2.5} />
+                              ) : (
+                                  <>
+                                      <Check size={18} className="text-white" strokeWidth={2.5} />
+                                      <span className="text-sm font-bold text-white">Got it</span>
+                                  </>
+                              )}
                           </button>
                       </div>
                   </div>
