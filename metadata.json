@@ -1,5 +1,5 @@
 {
-  "name": "LingoFlow AI",
+  "name": "TalkEast",
   "description": "A modern, AI-powered language learning companion for Japanese, Korean, and Chinese with PDF integration and Live Voice practice.",
   "requestFramePermissions": [
     "microphone"

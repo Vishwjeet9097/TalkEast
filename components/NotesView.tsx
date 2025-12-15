@@ -667,9 +667,9 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                           <h3 className="font-extrabold text-xl text-slate-900 dark:text-slate-50 leading-tight mb-2 line-clamp-2 tracking-tight">
                             {note.title}
                           </h3>
-                        </div>
-                      </div>
-                      
+                    </div>
+                  </div>
+                  
                       {/* Menu Button - Always Visible */}
                       <div className="relative note-menu shrink-0 z-50">
                         <button
@@ -773,7 +773,7 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                       <div 
                         className="text-slate-700 dark:text-slate-200 line-clamp-3 text-sm leading-relaxed min-h-[3.5rem] prose prose-sm dark:prose-invert max-w-none"
                         dangerouslySetInnerHTML={{ __html: note.content || "<span class='text-slate-400 dark:text-slate-500 italic'>No content</span>" }}
-                      />
+                  />
                     </div>
                     
                     {/* Footer */}

@@ -180,28 +180,28 @@ export default function PracticeHub({ profile }: Props) {
             // Priority 1: Use local content if course is provided and not forcing AI
             if (fromCourse && !forceAI) {
                 if (type === 'vocab') {
-                    // Use course vocabulary
-                    const allWords: VocabWord[] = [];
-                    fromCourse.chapters.forEach(ch => {
-                        allWords.push(...ch.vocab.filter(w => w.meaning && w.meaning.trim())); // Filter out empty meanings
+                // Use course vocabulary
+                const allWords: VocabWord[] = [];
+                fromCourse.chapters.forEach(ch => {
+                    allWords.push(...ch.vocab.filter(w => w.meaning && w.meaning.trim())); // Filter out empty meanings
+                });
+                
+                if (allWords.length > 0) {
+                    const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+                    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+                    generatedItems = selected.map((word, idx) => {
+                        const distractors = generateDistractors(word.meaning, allWords);
+                        return {
+                            id: `course-${idx}`,
+                            type: 'vocab' as PracticeType,
+                            question: `What does "${word.original}" mean?`,
+                            correctAnswer: word.meaning,
+                            possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'], // Ensure 4 options
+                            audioText: word.original,
+                            explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+                        };
                     });
-                    
-                    if (allWords.length > 0) {
-                        const shuffled = [...allWords].sort(() => Math.random() - 0.5);
-                        const selected = shuffled.slice(0, Math.min(10, shuffled.length));
-                        generatedItems = selected.map((word, idx) => {
-                            const distractors = generateDistractors(word.meaning, allWords);
-                            return {
-                                id: `course-${idx}`,
-                                type: 'vocab' as PracticeType,
-                                question: `What does "${word.original}" mean?`,
-                                correctAnswer: word.meaning,
-                                possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'], // Ensure 4 options
-                                audioText: word.original,
-                                explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
-                            };
-                        });
-                    }
+                }
                 } else {
                     // For grammar, listening, reading - try to extract from course content
                     const allWords: VocabWord[] = [];

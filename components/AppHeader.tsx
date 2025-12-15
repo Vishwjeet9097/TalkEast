@@ -50,10 +50,10 @@ export default function AppHeader({ profile, onUpdateProfile }: AppHeaderProps) 
             onClick={() => navigate('/profile')}
             className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all active:scale-95"
           >
-            LF
+            TE
           </button>
           <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
-            LingoFlow
+            TalkEast
           </h1>
         </div>
         

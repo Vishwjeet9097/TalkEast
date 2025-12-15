@@ -54,24 +54,24 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
         try {
             // Ensure DB is initialized
             await db.init();
-            const courses = await db.getCourses();
+        const courses = await db.getCourses();
             console.log('CourseView: Loaded courses:', courses.length);
-            const found = courses.find(c => c.id === courseId);
+        const found = courses.find(c => c.id === courseId);
             console.log('CourseView: Found course:', found?.title, 'with', found?.chapters?.length, 'chapters');
-            if (found) {
-                setCourse(found);
-                
-                const state = (location.state || {}) as { activeChapterId?: string, autoStartStudy?: boolean } | null;
-                const initialChapterId = state?.activeChapterId || chapterId;
+        if (found) {
+            setCourse(found);
+            
+            const state = (location.state || {}) as { activeChapterId?: string, autoStartStudy?: boolean } | null;
+            const initialChapterId = state?.activeChapterId || chapterId;
 
-                if (initialChapterId) {
+            if (initialChapterId) {
                     // Only set active chapter if it has data
-                    const ch = found.chapters.find(c => c.id === initialChapterId);
+                     const ch = found.chapters.find(c => c.id === initialChapterId);
                     if (ch && hasChapterData(ch)) {
                         setActiveChapter(initialChapterId);
                         if (state?.autoStartStudy && ch.vocab.length > 0) {
-                             setIsStudyMode(true);
-                        }
+                         setIsStudyMode(true);
+                     }
                     } else {
                         // If requested chapter has no data, find first chapter with data
                         const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
@@ -82,11 +82,11 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                     }
                 } else {
                     // Find first chapter with data
-                    const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
+                const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
                     const firstValidChapter = sortedChapters.find(ch => hasChapterData(ch));
                     if (firstValidChapter) {
                         setActiveChapter(firstValidChapter.id);
-                    }
+            }
                 }
             }
         } catch (error) {
@@ -163,7 +163,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           const firstValidChapter = sortedChapters[0];
           if (firstValidChapter) {
               navigate(`/course/${courseId}/chapter/${firstValidChapter.id}`, { replace: true });
-          }
+      }
       }
   }, [chapterId, course?.id, activeChapter, sortedChapters, courseId, navigate]);
 
@@ -235,7 +235,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           const updatedCourse = { ...course, chapters: updatedChapters };
           
           setCourse(updatedCourse);
-          await db.saveCourse(updatedCourse);
+          await db.saveCourse(updatedCourse); 
           
           // Auto-switch to the tab that was just generated
           if (type === 'dialogue') {
@@ -316,11 +316,11 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
               if (prev < currentVocabList.length - 1) {
                   setIsProcessingCard(false);
                   return prev + 1;
-              } else {
-                  setStudySessionCompleted(true);
+          } else {
+              setStudySessionCompleted(true);
                   setIsProcessingCard(false);
                   return prev;
-              }
+          }
           });
       }, 200);
   };
@@ -358,10 +358,10 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
               ]
               : accuracy >= 80
               ? [
-                  "Amazing work! You're building a strong foundation! 🎯",
-                  "Outstanding! Every word you learn brings you closer to fluency! 🌟",
-                  "Fantastic! Your dedication is paying off! Keep going! 💪",
-                  "Excellent! You're mastering the language one word at a time! 🚀",
+              "Amazing work! You're building a strong foundation! 🎯",
+              "Outstanding! Every word you learn brings you closer to fluency! 🌟",
+              "Fantastic! Your dedication is paying off! Keep going! 💪",
+              "Excellent! You're mastering the language one word at a time! 🚀",
                   "Brilliant! Consistency is key, and you're nailing it! ⭐"
               ]
               : accuracy >= 50
@@ -378,7 +378,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                   "Learning takes time! You've got this! ⭐",
                   "Every attempt makes you better! Keep going! 🌱",
                   "Don't give up! Practice makes perfect! 🎯"
-              ];
+          ];
           
           const motivation = motivationMessages[Math.floor(Math.random() * motivationMessages.length)];
           
@@ -471,12 +471,12 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                               >
                                   Retry
                               </button>
-                              <button 
-                                  onClick={exitStudy} 
+                          <button 
+                              onClick={exitStudy} 
                                   className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform"
-                              >
+                          >
                                   Continue Learning
-                              </button>
+                          </button>
                           </div>
                       </div>
                   </div>
@@ -540,10 +540,10 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                               {/* Main word - matching back meaning position and size */}
                               <div className="flex-1 flex flex-col items-center justify-center w-full">
                                   <h2 className="text-4xl font-extrabold text-slate-800 dark:text-white text-center mb-4 leading-tight break-words px-2">{currentCard.original}</h2>
-                                  
-                                  {/* Example sentence placeholder - matching back structure exactly */}
+                              
+                              {/* Example sentence placeholder - matching back structure exactly */}
                                   <div className="mb-4 min-h-[60px] flex items-center justify-center w-full">
-                                      <p className="text-slate-300 dark:text-slate-600 text-sm italic"></p>
+                                  <p className="text-slate-300 dark:text-slate-600 text-sm italic"></p>
                                   </div>
                               </div>
                               
@@ -570,16 +570,16 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                               <div className="flex-1 flex flex-col items-center justify-center w-full">
                                   <p className="text-xl text-white/80 font-medium mb-2 text-center break-words px-2">{currentCard.reading}</p>
                                   <h3 className="text-4xl font-extrabold text-white text-center mb-4 leading-tight break-words px-2">{currentCard.meaning}</h3>
-                                  
-                                  {currentCard.exampleSentence ? (
+                              
+                              {currentCard.exampleSentence ? (
                                       <div className="bg-black/20 backdrop-blur-md p-4 rounded-2xl w-full border border-white/10 mb-4">
                                           <p className="text-white/90 text-center italic text-sm leading-relaxed break-words">"{currentCard.exampleSentence}"</p>
-                                      </div>
-                                  ) : (
+                                  </div>
+                              ) : (
                                       <div className="mb-4 min-h-[60px] flex items-center justify-center">
-                                          <p className="text-white/50 text-sm italic">No example sentence</p>
-                                      </div>
-                                  )}
+                                      <p className="text-white/50 text-sm italic">No example sentence</p>
+                                  </div>
+                              )}
                               </div>
                               
                               {/* Sound button in same position as front */}
@@ -650,27 +650,27 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       {sortedChapters.map((ch, idx) => {
                           // Only render chapters with data (already filtered in sortedChapters)
                           return (
-                              <button 
-                                key={ch.id}
-                                onClick={() => {
-                                    stopPlayback();
-                                    setActiveChapter(ch.id);
-                                    setShowTableOfContents(false);
+                          <button 
+                            key={ch.id}
+                            onClick={() => {
+                                stopPlayback();
+                                setActiveChapter(ch.id);
+                                setShowTableOfContents(false);
                                     navigate(`/course/${courseId}/chapter/${ch.id}`, { replace: true });
-                                }}
-                                className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
-                                    activeChapter === ch.id 
-                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
-                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                                }`}
-                              >
-                                  <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
-                                      {idx + 1}
-                                  </div>
-                                  <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                      {ch.title}
-                                  </span>
-                              </button>
+                            }}
+                            className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
+                                activeChapter === ch.id 
+                                ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                              <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                  {idx + 1}
+                              </div>
+                              <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                  {ch.title}
+                              </span>
+                          </button>
                           );
                       })}
                   </div>
@@ -742,8 +742,8 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                                     : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
                                         }`}
                                     >
-                                        <MessageCircle size={16} /> Dialogue
-                                    </button>
+                            <MessageCircle size={16} /> Dialogue
+                        </button>
                                     <button 
                                         onClick={() => { stopPlayback(); setViewMode('vocab'); }} 
                                         disabled={!hasVocab}
@@ -755,8 +755,8 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                                     : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
                                         }`}
                                     >
-                                        <Layers size={16} /> Words
-                                    </button>
+                            <Layers size={16} /> Words
+                        </button>
                                     <button 
                                         onClick={() => { stopPlayback(); setViewMode('grammar'); }} 
                                         disabled={!hasGrammar}
@@ -768,8 +768,8 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                                     : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
                                         }`}
                                     >
-                                        <BookOpen size={16} /> Grammar
-                                    </button>
+                            <BookOpen size={16} /> Grammar
+                        </button>
                                 </>
                             );
                         })()}

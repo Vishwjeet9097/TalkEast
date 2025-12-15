@@ -20,7 +20,7 @@ export const NotificationService = {
           icon: icon || '/icon.png', // Fallback icon
           vibrate: [200, 100, 200], // Vibration pattern for Android
           badge: '/badge.png',
-          tag: 'lingoflow-app' // Group notifications
+          tag: 'talkeast-app' // Group notifications
         } as any);
       } catch (e) {
         console.warn("Notification failed", e);

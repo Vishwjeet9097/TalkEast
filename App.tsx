@@ -71,47 +71,47 @@ export default function App() {
     const initApp = async () => {
       try {
         setInitError(null);
-        await db.init();
-        const user = await db.getProfile();
-        const normalized = normalizeProfile(user);
-        if (normalized && normalized.useEnvKey === undefined) {
-          normalized.useEnvKey = true;
-        }
-        setProfile(normalized);
-        setLoading(false);
+      await db.init();
+      const user = await db.getProfile();
+      const normalized = normalizeProfile(user);
+      if (normalized && normalized.useEnvKey === undefined) {
+        normalized.useEnvKey = true;
+      }
+      setProfile(normalized);
+      setLoading(false);
         
         try {
-          NotificationService.requestPermission();
+      NotificationService.requestPermission();
         } catch (notifError) {
           console.warn('Notification permission error:', notifError);
         }
+      
+      // System-first theme detection
+      const applyTheme = (themePref: 'light' | 'dark' | 'system' | undefined) => {
+        let shouldBeDark = false;
         
-        // System-first theme detection
-        const applyTheme = (themePref: 'light' | 'dark' | 'system' | undefined) => {
-          let shouldBeDark = false;
-          
-          if (themePref === 'system' || !themePref) {
-            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            shouldBeDark = systemPrefersDark;
-          } else {
-            shouldBeDark = themePref === 'dark';
-          }
-          
-          document.documentElement.classList.toggle('dark', shouldBeDark);
-        };
+        if (themePref === 'system' || !themePref) {
+          const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          shouldBeDark = systemPrefersDark;
+        } else {
+          shouldBeDark = themePref === 'dark';
+        }
         
-        applyTheme(normalized?.theme);
-        
-        // Listen for system theme changes
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const handleThemeChange = (e: MediaQueryListEvent) => {
-          if (!normalized?.theme || normalized.theme === 'system') {
-            applyTheme('system');
-          }
-        };
-        mediaQuery.addEventListener('change', handleThemeChange);
-        
-        return () => mediaQuery.removeEventListener('change', handleThemeChange);
+        document.documentElement.classList.toggle('dark', shouldBeDark);
+      };
+      
+      applyTheme(normalized?.theme);
+      
+      // Listen for system theme changes
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleThemeChange = (e: MediaQueryListEvent) => {
+        if (!normalized?.theme || normalized.theme === 'system') {
+          applyTheme('system');
+        }
+      };
+      mediaQuery.addEventListener('change', handleThemeChange);
+      
+      return () => mediaQuery.removeEventListener('change', handleThemeChange);
       } catch (err: any) {
         console.error('App initialization error:', err);
         setInitError(err);
@@ -193,11 +193,11 @@ export default function App() {
         <div className="flex flex-col items-center gap-6">
             <div className="relative">
                 <div className="h-20 w-20 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 animate-float shadow-xl flex items-center justify-center">
-                    <span className="text-3xl font-bold text-white">LF</span>
+                    <span className="text-3xl font-bold text-white">TE</span>
                 </div>
                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-12 h-1 bg-black/20 blur-md rounded-full animate-pulse"></div>
             </div>
-            <p className="text-slate-500 font-medium tracking-wide text-sm uppercase">Loading LingoFlow...</p>
+            <p className="text-slate-500 font-medium tracking-wide text-sm uppercase">Loading TalkEast...</p>
         </div>
       </div>
     );
@@ -205,9 +205,9 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <ProcessingProvider>
-        <HashRouter>
-          <div className="min-h-screen relative selection:bg-indigo-500/30 overflow-x-hidden">
+    <ProcessingProvider>
+      <HashRouter>
+        <div className="min-h-screen relative selection:bg-indigo-500/30 overflow-x-hidden">
             {/* Global Error Display */}
             {error && (
               <ErrorDisplay 
@@ -220,11 +220,11 @@ export default function App() {
               />
             )}
             
-            {/* Dynamic Background */}
-            <div className="mesh-bg light-mesh dark:hidden"></div>
-            <div className="mesh-bg hidden dark:block bg-slate-900"></div>
-            
-            <GlobalStatus />
+          {/* Dynamic Background */}
+          <div className="mesh-bg light-mesh dark:hidden"></div>
+          <div className="mesh-bg hidden dark:block bg-slate-900"></div>
+          
+          <GlobalStatus />
 
           {/* App Header - Fixed at top */}
           {profile?.onboardingComplete && (
