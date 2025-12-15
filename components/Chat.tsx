@@ -11,6 +11,8 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  expandedContent?: string;
+  isExpanded?: boolean;
 }
 
 export default function Chat({ profile }: { profile: UserProfile | null }) {
@@ -19,7 +21,9 @@ export default function Chat({ profile }: { profile: UserProfile | null }) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [expandingMessageId, setExpandingMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -48,9 +52,27 @@ export default function Chat({ profile }: { profile: UserProfile | null }) {
 
   const suggestions = getSuggestions();
 
+  // Improved scrolling - scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    // Use setTimeout to ensure DOM is updated
+    const timer = setTimeout(() => {
+      if (messagesEndRef.current && messagesContainerRef.current) {
+        const container = messagesContainerRef.current;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+        const scrollTop = container.scrollTop;
+        
+        // Only auto-scroll if user is near bottom (within 100px)
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+        
+        if (isNearBottom || messages.length <= 2) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [messages, isLoading]);
 
   // Cleanup toast timeout on unmount
   useEffect(() => {
@@ -94,8 +116,12 @@ export default function Chat({ profile }: { profile: UserProfile | null }) {
             role: 'user',
             parts: [{ 
               text: `You are an expert language learning tutor for ${profile.targetLanguage}. The student's native language is ${profile.nativeLanguage}. 
-              Provide clear, helpful, and encouraging responses. Use examples when explaining grammar or vocabulary.
-              Question: ${userMessage.content}` 
+              
+IMPORTANT: Keep your response SHORT and CONCISE (2-4 sentences maximum). Be direct and helpful. Save detailed explanations for when the student asks for more.
+              
+Provide clear, helpful, and encouraging responses. Use examples when explaining grammar or vocabulary, but keep examples brief.
+              
+Question: ${userMessage.content}` 
             }],
           },
         ],
@@ -121,6 +147,7 @@ export default function Chat({ profile }: { profile: UserProfile | null }) {
         role: 'assistant',
         content: text,
         timestamp: Date.now(),
+        isExpanded: false,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -176,13 +203,83 @@ export default function Chat({ profile }: { profile: UserProfile | null }) {
     }
   };
 
+  const handleExplainMore = async (messageId: string, originalContent: string) => {
+    if (!profile || expandingMessageId === messageId) return;
+    
+    setExpandingMessageId(messageId);
+    
+    try {
+      const apiKey = getApiKeyForProfile(profile);
+      if (!apiKey) {
+        throw new Error('API key not found');
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      const model = ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ 
+              text: `You are an expert language learning tutor for ${profile.targetLanguage}. The student's native language is ${profile.nativeLanguage}. 
+              
+The student asked a question and you gave this brief answer: "${originalContent}"
+              
+Now provide a MORE DETAILED and COMPREHENSIVE explanation. Include:
+- More examples (3-5 examples)
+- Grammar rules if applicable
+- Common mistakes to avoid
+- Usage tips
+- Cultural context if relevant
+              
+Make it thorough but well-organized.` 
+            }],
+          },
+        ],
+      });
+
+      const response = await model;
+      let expandedText = '';
+      if (response.response) {
+        const candidates = response.response.candidates;
+        if (candidates && candidates.length > 0) {
+          const content = candidates[0].content;
+          if (content && content.parts) {
+            expandedText = content.parts.map((p: any) => p.text || '').join('');
+          }
+        }
+      }
+      if (!expandedText) {
+        expandedText = response.text || 'Could not generate expanded explanation.';
+      }
+
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, expandedContent: expandedText, isExpanded: true }
+          : msg
+      ));
+    } catch (error) {
+      console.error('Error expanding message:', error);
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, expandedContent: 'Sorry, could not generate expanded explanation. Please try again.', isExpanded: true }
+          : msg
+      ));
+    } finally {
+      setExpandingMessageId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen relative">
       {/* Fixed Background - maintains consistent gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 -z-10"></div>
       
       {/* Main Content - with padding for global header and footer */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 pt-[calc(5rem+env(safe-area-inset-top))] pb-36 scroll-smooth relative z-0">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 md:px-6 py-4 pt-[calc(5rem+env(safe-area-inset-top))] pb-36 scroll-smooth relative z-0"
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] -mt-8">
             {/* Hero Greeting Card - Enhanced */}
@@ -265,6 +362,39 @@ export default function Chat({ profile }: { profile: UserProfile | null }) {
                     <p className="text-sm md:text-[15px] leading-relaxed whitespace-pre-wrap font-medium">
                       {message.content}
                     </p>
+                    
+                    {/* Expanded Content */}
+                    {message.isExpanded && message.expandedContent && (
+                      <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-700/50">
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                          Detailed Explanation
+                        </p>
+                        <p className="text-sm md:text-[15px] leading-relaxed whitespace-pre-wrap font-normal text-slate-700 dark:text-slate-300">
+                          {message.expandedContent}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Explain More Button - Only for assistant messages */}
+                    {message.role === 'assistant' && !message.isExpanded && (
+                      <button
+                        onClick={() => handleExplainMore(message.id, message.content)}
+                        disabled={expandingMessageId === message.id}
+                        className="mt-3 flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {expandingMessageId === message.id ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Expanding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={14} />
+                            <span>Explain More</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
