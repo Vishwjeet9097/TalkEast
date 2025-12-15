@@ -25,7 +25,6 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   const [studySessionCompleted, setStudySessionCompleted] = useState(false);
   const [flashcardCorrectCount, setFlashcardCorrectCount] = useState(0);
   const [flashcardScore, setFlashcardScore] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Dialogue Playback State
   const [activeDialogueType, setActiveDialogueType] = useState<'short' | 'long'>('short');
@@ -76,51 +75,6 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       return sortedChapters.find(c => c.id === activeChapter);
   }, [sortedChapters, activeChapter]);
 
-  // Auto-navigate to appropriate tab based on chapter content
-  useEffect(() => {
-    if (!currentChapter) return;
-    
-    const hasDialogue = (currentChapter.shortDialogue && currentChapter.shortDialogue.length > 0) || 
-                        (currentChapter.longDialogue && currentChapter.longDialogue.length > 0);
-    const hasVocab = currentChapter.vocab.length > 0;
-    const hasGrammar = currentChapter.grammar.length > 0;
-    
-    // Count how many tabs have content
-    const tabsWithContent = [hasDialogue, hasVocab, hasGrammar].filter(Boolean).length;
-    
-    // If no content, redirect to chapter index
-    if (tabsWithContent === 0) {
-        if (courseId) {
-            navigate(`/course/${courseId}/index`);
-        }
-        return;
-    }
-    
-    // Priority order: dialogue > vocab > grammar
-    // If 2 tabs have content, navigate to first available in priority order
-    if (tabsWithContent === 2) {
-        if (hasDialogue) {
-            setViewMode('dialogue');
-        } else if (hasVocab) {
-            setViewMode('vocab');
-        } else if (hasGrammar) {
-            setViewMode('grammar');
-        }
-    }
-    // If only one tab has content, auto-navigate to it
-    else if (tabsWithContent === 1) {
-        if (hasDialogue) {
-            setViewMode('dialogue');
-        } else if (hasVocab) {
-            setViewMode('vocab');
-        } else if (hasGrammar) {
-            setViewMode('grammar');
-        }
-    }
-    // If all 3 tabs have content, keep default (dialogue) - normal approach
-    // This ensures normal flow is maintained
-  }, [currentChapter, courseId, navigate]);
-
   const currentVocabList = currentChapter?.vocab || [];
 
   const nextChapterId = useMemo(() => {
@@ -139,20 +93,6 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           grammarCount: chapter.grammar.length
       }
   };
-
-  const hasChapterContent = (chapter: Chapter): boolean => {
-      const hasDialogue = (chapter.shortDialogue && chapter.shortDialogue.length > 0) || 
-                          (chapter.longDialogue && chapter.longDialogue.length > 0);
-      const hasVocab = chapter.vocab.length > 0;
-      const hasGrammar = chapter.grammar.length > 0;
-      return hasDialogue || hasVocab || hasGrammar;
-  };
-
-  // Filter chapters with content for TOC
-  const chaptersWithContent = useMemo(() => {
-      if (!course) return [];
-      return sortedChapters.filter(ch => hasChapterContent(ch));
-  }, [sortedChapters, course]);
 
   useEffect(() => {
       if (!chapterId || !course) return;
@@ -272,17 +212,11 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           setStudySessionCompleted(false);
           setFlashcardCorrectCount(0);
           setFlashcardScore(0);
-          setIsTransitioning(false);
       }
   };
 
   const nextCard = (known: boolean) => {
-      // Prevent rapid clicks and race conditions
-      if (isTransitioning) return;
-      
-      setIsTransitioning(true);
       setIsFlipped(false);
-      
       // Track correct answers (known = true means "Got it")
       if (known) {
           setFlashcardCorrectCount(prev => prev + 1);
@@ -295,7 +229,6 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           } else {
               setStudySessionCompleted(true);
           }
-          setIsTransitioning(false);
       }, 200);
   };
 
@@ -319,10 +252,9 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           const motivation = motivationMessages[Math.floor(Math.random() * motivationMessages.length)];
           
           return (
-              <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-md flex items-start justify-center p-4 pt-16 sm:pt-20 sm:items-center overflow-y-auto">
-                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl max-w-md w-full pt-[50px] pb-8 px-8 animate-in zoom-in-95 duration-300 relative border border-white/60 dark:border-white/20 overflow-hidden mt-4 sm:mt-0">
+              <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full pt-6 pb-8 px-8 animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden">
                       <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
-                      <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-2xl"></div>
                       
                       <div className="relative z-10 text-center">
                           <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl shadow-yellow-500/30 animate-bounce">
@@ -362,11 +294,11 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       return (
           <div className="fixed inset-0 z-[60] bg-slate-50 dark:bg-slate-900 overflow-y-auto overscroll-contain">
               {/* Scrollable Content Container */}
-              <div className="pb-[calc(8rem+env(safe-area-inset-bottom))]">
-                  <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-2 flex justify-between items-center sticky top-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-20 border-b border-slate-200/50 dark:border-slate-700/50">
+              <div className="">
+                  <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] flex justify-between items-center sticky top-0 bg-slate-50 dark:bg-slate-900 z-10 backdrop-blur-sm">
                       <button 
                           onClick={exitStudy} 
-                          className="p-3 bg-white dark:bg-slate-800 shadow-sm rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 z-30"
+                          className="p-3 bg-white dark:bg-slate-800 shadow-sm rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
                       >
                           <ArrowLeft size={20} className="text-slate-500" />
                       </button>
@@ -376,17 +308,17 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       </div>
                       <div className="w-12"></div>
                   </div>
-              
-              <div className="w-full px-6 mt-2 mb-4">
-                 <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${((currentCardIndex + 1) / currentVocabList.length) * 100}%` }}></div>
-                 </div>
-              </div>
+                  
+                  <div className="w-full px-6 mt-2">
+                     <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${((currentCardIndex + 1) / currentVocabList.length) * 100}%` }}></div>
+                     </div>
+                  </div>
 
-                  <div className="flex items-center justify-center px-4 py-4 perspective-800">
-                      <div className={`relative w-full max-w-sm min-h-[338px] transition-all duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+                  <div className="flex items-center justify-center px-4 py-6 perspective-800">
+                      <div className={`relative w-full max-w-sm h-[450px] transition-all duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
                           {/* FRONT - Same structure as back but with front colors */}
-                          <div className="absolute inset-0 backface-hidden bg-white dark:bg-slate-800 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                          <div className="absolute inset-0 backface-hidden bg-white dark:bg-slate-800 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 shadow-2xl border border-slate-100 dark:border-slate-700">
                               {/* Badge at top - matching back structure */}
                               <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full mb-8">Tap to Reveal</span>
                               
@@ -394,26 +326,26 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                               <p className="text-2xl text-slate-400 dark:text-slate-500 font-medium mb-3 text-center h-[32px]"></p>
                               
                               {/* Main word - matching back meaning position and size */}
-                          <h2 className="text-5xl font-extrabold text-slate-800 dark:text-white text-center mb-6 leading-tight break-words px-2">{currentCard.original}</h2>
+                              <h2 className="text-5xl font-extrabold text-slate-800 dark:text-white text-center mb-6 leading-tight">{currentCard.original}</h2>
                               
                               {/* Example sentence placeholder - matching back structure exactly */}
-                              <div className="mb-6 min-h-[88px] flex items-center justify-center w-full">
+                              <div className="mb-6 h-[88px] flex items-center justify-center w-full">
                                   <p className="text-slate-300 dark:text-slate-600 text-sm italic"></p>
                               </div>
                               
                               {/* Sound button in same position as back */}
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} 
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} 
                                 className="p-4 bg-slate-50 dark:bg-slate-700 rounded-full text-indigo-600 dark:text-indigo-400 hover:scale-110 transition-transform active:bg-indigo-100 shadow-md"
-                          >
-                             {playingText === currentCard.original && audioState === 'LOADING' ? <Loader2 size={24} className="animate-spin" /> : <Volume2 size={28} />}
-                          </button>
-                      </div>
-                      {/* BACK */}
+                              >
+                                 {playingText === currentCard.original && audioState === 'LOADING' ? <Loader2 size={24} className="animate-spin" /> : <Volume2 size={28} />}
+                              </button>
+                          </div>
+                          {/* BACK */}
                           <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 rotate-y-180 shadow-2xl text-white relative overflow-hidden">
-                           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                           <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
-
+                               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                               <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
+                              
                               {/* Match exact structure and spacing as front */}
                               {currentCard.partOfSpeech ? (
                                   <span className="text-xs font-bold text-white/90 uppercase tracking-widest bg-white/20 backdrop-blur-md px-3 py-1 rounded-full mb-8">{currentCard.partOfSpeech}</span>
@@ -421,15 +353,15 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                   <span className="text-xs font-bold text-transparent uppercase tracking-widest px-3 py-1 rounded-full mb-8">Placeholder</span>
                               )}
                               
-                              <p className="text-2xl text-white/80 font-medium mb-3 text-center break-words px-2">{currentCard.reading}</p>
-                              <h3 className="text-5xl font-extrabold text-white text-center mb-6 leading-tight break-words px-2">{currentCard.meaning}</h3>
+                              <p className="text-2xl text-white/80 font-medium mb-3 text-center">{currentCard.reading}</p>
+                              <h3 className="text-5xl font-extrabold text-white text-center mb-6 leading-tight">{currentCard.meaning}</h3>
                               
                               {currentCard.exampleSentence ? (
                                   <div className="bg-black/20 backdrop-blur-md p-5 rounded-2xl w-full border border-white/10 mb-6">
-                                      <p className="text-white/90 text-center italic text-lg leading-relaxed break-words">"{currentCard.exampleSentence}"</p>
+                                      <p className="text-white/90 text-center italic text-lg leading-relaxed">"{currentCard.exampleSentence}"</p>
                                   </div>
                               ) : (
-                                  <div className="mb-6 min-h-[88px] flex items-center justify-center">
+                                  <div className="mb-6 h-[88px] flex items-center justify-center">
                                       <p className="text-white/50 text-sm italic">No example sentence</p>
                                   </div>
                               )}
@@ -445,49 +377,32 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       </div>
                   </div>
                   
-                  {/* Action Buttons - Positioned just below card, above bottom nav */}
-                  <div className="px-4 py-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
-                      <div className="max-w-sm mx-auto w-full flex justify-between items-center gap-3">
+                  {/* Action Buttons - Positioned just below card */}
+                  <div className="px-4 py-6 pb-8">
+                      <div className="max-w-sm mx-auto flex justify-between items-center gap-3">
                           <button 
                               onClick={(e) => { e.stopPropagation(); nextCard(false); }} 
-                              disabled={isTransitioning}
-                              className="flex-1 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-white"
-                              style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' }}
+                              className="flex-1 h-20 rounded-2xl bg-white dark:bg-slate-800 border-2 border-red-200 dark:border-red-900/50 shadow-lg shadow-red-500/10 dark:shadow-red-900/20 p-4 flex flex-row items-center justify-center gap-3 active:scale-95 transition-all hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 hover:shadow-xl hover:shadow-red-500/20 dark:hover:shadow-red-900/30 group"
                           >
-                              <RotateCcw size={18} strokeWidth={2.5} />
-                              <span>Again</span>
+                              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-900/60 transition-colors">
+                                  <RotateCcw size={20} className="text-red-600 dark:text-red-300" strokeWidth={2.5} />
+                              </div>
+                              <span className="text-sm font-bold text-red-600 dark:text-red-300 uppercase tracking-wide">Again</span>
                           </button>
                           <button 
                               onClick={(e) => { e.stopPropagation(); nextCard(true); }} 
-                              disabled={isTransitioning}
-                              className="btn-primary flex-1 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              className="flex-1 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 border-2 border-indigo-400/50 dark:border-indigo-500/50 shadow-lg shadow-indigo-500/30 dark:shadow-indigo-900/40 p-4 flex flex-row items-center justify-center gap-3 active:scale-95 transition-all hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 hover:shadow-xl hover:shadow-indigo-500/40 dark:hover:shadow-indigo-900/50 group"
                           >
-                              <Check size={18} strokeWidth={2.5} />
-                              <span>Got it</span>
+                              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
+                                  <Check size={20} className="text-white" strokeWidth={2.5} />
+                              </div>
+                              <span className="text-sm font-bold text-white uppercase tracking-wide">Got it</span>
                           </button>
                       </div>
                   </div>
               </div>
           </div>
       );
-  }
-
-  // Check if current chapter has any content
-  const currentChapterHasContent = currentChapter && hasChapterContent(currentChapter);
-
-  // If chapter has no content, redirect to index
-  if (currentChapter && !currentChapterHasContent) {
-    if (courseId) {
-      return <Navigate to={`/course/${courseId}/index`} replace />;
-    }
-  }
-
-  if (!course || !currentChapter) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-      </div>
-    );
   }
 
   return (
@@ -505,39 +420,28 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       {/* Timeline Line */}
                       <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 dark:bg-slate-800"></div>
                       
-                      {chaptersWithContent.length > 0 ? (
-                          chaptersWithContent.map((ch) => {
-                              // Get original position in all chapters (including blank ones) for proper numbering
-                              const originalIndex = sortedChapters.findIndex(c => c.id === ch.id);
-                              
-                              return (
-                                  <button 
-                                      key={ch.id}
-                                      onClick={() => {
-                                          stopPlayback();
-                                          setActiveChapter(ch.id);
-                                          setShowTableOfContents(false);
-                                      }}
-                                      className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
-                                          activeChapter === ch.id 
-                                          ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
-                                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                                      }`}
-                                  >
-                                      <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
-                                          {originalIndex >= 0 ? originalIndex + 1 : ch.order + 1}
-                                      </div>
-                                      <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                          {ch.title}
-                                      </span>
-                                  </button>
-                              );
-                          })
-                      ) : (
-                          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                              <p className="text-sm">No chapters with content available</p>
-                          </div>
-                      )}
+                      {sortedChapters.map((ch, idx) => (
+                          <button 
+                            key={ch.id}
+                            onClick={() => {
+                                stopPlayback();
+                                setActiveChapter(ch.id);
+                                setShowTableOfContents(false);
+                            }}
+                            className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
+                                activeChapter === ch.id 
+                                ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                              <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                  {idx + 1}
+                              </div>
+                              <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                  {ch.title}
+                              </span>
+                          </button>
+                      ))}
                   </div>
               </div>
           </div>
@@ -568,12 +472,12 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                     Next chapter <ChevronRight size={14} />
                   </button>
               )}
-          <button 
-            onClick={() => setShowTableOfContents(true)}
-            className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-full text-slate-600 dark:text-slate-300 hover:text-indigo-600 flex items-center justify-center transition-colors"
-          >
-              <List size={20} />
-          </button>
+              <button 
+                onClick={() => setShowTableOfContents(true)}
+                className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-full text-slate-600 dark:text-slate-300 hover:text-indigo-600 flex items-center justify-center transition-colors"
+              >
+                  <List size={20} />
+              </button>
           </div>
       </div>
 
@@ -582,7 +486,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
              {/* Content Header & Tabs */}
              <div className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 dark:border-slate-700/50">
                 <div className="p-6 pb-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {sortedChapters.findIndex(c => c.id === currentChapter.id) + 1}</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {currentChapter.order + 1}</p>
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">{currentChapter.title}</h1>
                 </div>
 
@@ -699,7 +603,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                              </div>
                         ) : (
                             <>
-                                <div className="flex justify-center mb-6">
+                                <div className="flex justify-end mb-6">
                                     <button onClick={startStudy} className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform">
                                         <Play size={18} fill="currentColor" /> Start Flashcards
                                     </button>

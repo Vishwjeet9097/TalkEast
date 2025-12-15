@@ -11,7 +11,7 @@ export interface UserProfile {
   nativeLanguage: Language;
   targetLanguage: Language;
   onboardingComplete: boolean;
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'system';
   apiKey?: string;
   useEnvKey?: boolean;
 }

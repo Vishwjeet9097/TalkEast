@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'r
 import { db } from './services/storage';
 import { NotificationService } from './services/notifications';
 import { UserProfile, Language } from './types';
-import { BookOpen, Mic, PenTool, Layout, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit, Sun, Moon, UserRound } from 'lucide-react';
+import { BookOpen, Mic, PenTool, Layout, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit, Sun, Moon, UserRound, MessageSquare } from 'lucide-react';
 import { ProcessingProvider } from './context/ProcessingContext';
 import GlobalStatus from './components/GlobalStatus';
 
@@ -18,6 +18,11 @@ import NotesView from './components/NotesView';
 import PDFUploader from './components/PDFUploader';
 import PracticeHub from './components/PracticeHub';
 import Profile from './components/Profile';
+import Chat from './components/Chat';
+import AskWithAI from './components/AskWithAI';
+import FloatingAIWidget from './components/FloatingAIWidget';
+import AppHeader from './components/AppHeader';
+import AppFooter from './components/AppFooter';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -40,8 +45,32 @@ export default function App() {
       setLoading(false);
       NotificationService.requestPermission();
       
-      const isDark = normalized?.theme === 'dark';
-      document.documentElement.classList.toggle('dark', isDark);
+      // System-first theme detection
+      const applyTheme = (themePref: 'light' | 'dark' | 'system' | undefined) => {
+        let shouldBeDark = false;
+        
+        if (themePref === 'system' || !themePref) {
+          const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          shouldBeDark = systemPrefersDark;
+        } else {
+          shouldBeDark = themePref === 'dark';
+        }
+        
+        document.documentElement.classList.toggle('dark', shouldBeDark);
+      };
+      
+      applyTheme(normalized?.theme);
+      
+      // Listen for system theme changes
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleThemeChange = (e: MediaQueryListEvent) => {
+        if (!normalized?.theme || normalized.theme === 'system') {
+          applyTheme('system');
+        }
+      };
+      mediaQuery.addEventListener('change', handleThemeChange);
+      
+      return () => mediaQuery.removeEventListener('change', handleThemeChange);
     };
     initApp();
   }, []);
@@ -51,7 +80,13 @@ export default function App() {
     if (!normalized) return;
     await db.saveProfile(normalized);
     setProfile(normalized);
-    document.documentElement.classList.toggle('dark', normalized.theme === 'dark');
+    
+    // Apply theme
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldBeDark = normalized.theme === 'system' 
+      ? systemPrefersDark 
+      : normalized.theme === 'dark';
+    document.documentElement.classList.toggle('dark', shouldBeDark);
   };
 
   if (loading) {
@@ -79,6 +114,11 @@ export default function App() {
           <div className="mesh-bg hidden dark:block bg-slate-900"></div>
           
           <GlobalStatus />
+
+          {/* App Header - Fixed at top */}
+          {profile?.onboardingComplete && (
+            <AppHeader profile={profile} onUpdateProfile={handleProfileUpdate} />
+          )}
 
           {/* Main Route Container */}
           <div className="pb-32 md:pb-0">
@@ -116,6 +156,14 @@ export default function App() {
                   element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><LiveAssistant profile={profile} /></MainLayout>} 
                 />
                 <Route 
+                  path="/chat" 
+                  element={<Chat profile={profile} />} 
+                />
+                <Route 
+                  path="/ask-ai" 
+                  element={<AskWithAI profile={profile} />} 
+                />
+                <Route 
                   path="/notes" 
                   element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><NotesView profile={profile} /></MainLayout>} 
                 />
@@ -130,9 +178,14 @@ export default function App() {
               </Routes>
           </div>
           
-          {/* Mobile Navigation */}
+          {/* App Footer - Fixed at bottom with glass effect */}
           {profile?.onboardingComplete && (
-             <MobileNav />
+            <AppFooter />
+          )}
+          
+          {/* Floating AI Widget - Visible on all screens except onboarding and chat */}
+          {profile?.onboardingComplete && (
+            <FloatingAIWidgetWrapper profile={profile} />
           )}
         </div>
       </HashRouter>
@@ -140,65 +193,17 @@ export default function App() {
   );
 }
 
-const MobileNav = () => {
-  const navigate = useNavigate();
+// Wrapper component to conditionally show FloatingAIWidget
+function FloatingAIWidgetWrapper({ profile }: { profile: UserProfile | null }) {
   const location = useLocation();
-
-  const isActive = (path: string) => location.pathname.startsWith(path);
-
-  const navItems = [
-    { icon: Home, label: 'Home', path: '/dashboard' },
-    { icon: BrainCircuit, label: 'Practice', path: '/practice' },
-    { icon: Plus, label: 'Create', path: '/upload', special: true },
-    { icon: Mic, label: 'Live', path: '/live' },
-    { icon: PenTool, label: 'Notes', path: '/notes' },
-  ];
-
-  if (location.pathname === '/onboarding') return null;
-
-  return (
-    <div className="fixed bottom-6 left-4 right-4 md:hidden z-40 pointer-events-none">
-      <div className="max-w-md mx-auto pointer-events-auto">
-          <div className="glass-panel rounded-3xl p-2 px-3 flex justify-between items-center shadow-2xl border border-white/60 dark:border-white/10 bg-white/90 dark:bg-slate-800/90 backdrop-blur-2xl">
-            {navItems.map((item) => {
-              const active = isActive(item.path);
-              
-              if (item.special) {
-                  return (
-                    <button
-                        key={item.path}
-                        onClick={() => navigate(item.path)}
-                        className={`relative -top-5 w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40 transition-transform active:scale-95 ${
-                            active ? 'bg-slate-800 dark:bg-white text-white dark:text-slate-900' : 'bg-indigo-600 text-white'
-                        }`}
-                    >
-                        <Plus size={28} strokeWidth={2.5} />
-                    </button>
-                  )
-              }
-
-              return (
-                <button
-                    key={item.path}
-                    onClick={() => navigate(item.path)}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-200 group relative"
-                >
-                    <div className={`p-2 rounded-2xl transition-all duration-300 ${
-                        active 
-                        ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300' 
-                        : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'
-                    }`}>
-                        <item.icon size={22} strokeWidth={active ? 2.5 : 2} fill={active ? "currentColor" : "none"} className={active ? "opacity-100" : "opacity-80"} />
-                    </div>
-                    {active && <span className="absolute -bottom-1 w-1 h-1 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>}
-                </button>
-              )
-            })}
-          </div>
-      </div>
-    </div>
-  );
-};
+  
+  // Hide on chat page
+  if (location.pathname === '/chat') {
+    return null;
+  }
+  
+  return <FloatingAIWidget profile={profile} />;
+}
 
 const MainLayout = ({ 
   children, 
@@ -209,92 +214,11 @@ const MainLayout = ({
   profile: UserProfile | null,
   onUpdateProfile?: (p: UserProfile) => void 
 }) => {
-    const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-    const navigate = useNavigate();
-    const isDarkTheme = profile?.theme === 'dark';
-    const ThemeIcon = isDarkTheme ? Moon : Sun;
-
-    const switchLanguage = (lang: Language) => {
-        if (profile && onUpdateProfile) {
-            onUpdateProfile({ ...profile, targetLanguage: lang });
-            setIsLangMenuOpen(false);
-        }
-    };
-
-    const toggleTheme = () => {
-        if (profile && onUpdateProfile) {
-            const newTheme = profile.theme === 'light' ? 'dark' : 'light';
-            onUpdateProfile({ ...profile, theme: newTheme });
-        }
-    }
-
-    const supportedLanguages = [Language.JAPANESE, Language.KOREAN, Language.CHINESE];
-
     return (
         <div className="max-w-md mx-auto md:max-w-5xl min-h-screen relative flex flex-col">
-            <header className="sticky top-0 z-30 px-6 py-4 pt-[calc(1.5rem+env(safe-area-inset-top))] mb-4 flex justify-between items-center bg-gradient-to-b from-white/90 to-white/0 dark:from-slate-900/90 dark:to-slate-900/0 backdrop-blur-sm md:rounded-b-3xl md:bg-white/50 md:backdrop-blur-xl transition-all duration-300">
-                 <div className="flex items-center gap-3">
-                     <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-500/20">
-                        LF
-                     </div>
-                     <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
-                        LingoFlow
-                     </h1>
-                 </div>
-                 
-                 <div className="flex items-center gap-3">
-                     <button
-                        onClick={() => navigate('/profile')}
-                        className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
-                     >
-                        <UserRound size={18} />
-                     </button>
-                     <button
-                        onClick={toggleTheme}
-                        className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-amber-300 transition-colors"
-                     >
-                        <ThemeIcon size={18} />
-                     </button>
-
-                     <div className="relative">
-                         <button 
-                            onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                            className="pl-3 pr-2 py-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 transition-all active:scale-95"
-                         >
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-                            {profile?.targetLanguage}
-                            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isLangMenuOpen ? 'rotate-180' : ''}`} />
-                         </button>
-
-                         {isLangMenuOpen && (
-                             <div className="absolute right-0 top-full mt-2 w-48 glass-panel rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-700 z-50 p-1">
-                                 {supportedLanguages.map((lang) => (
-                                     <button
-                                        key={lang}
-                                        onClick={() => switchLanguage(lang)}
-                                        className={`w-full text-left px-4 py-3 text-sm font-semibold rounded-xl flex items-center justify-between transition-colors ${
-                                            profile?.targetLanguage === lang 
-                                            ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300' 
-                                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                        }`}
-                                     >
-                                         {lang}
-                                         {profile?.targetLanguage === lang && <Check size={16} />}
-                                     </button>
-                                 ))}
-                             </div>
-                         )}
-                     </div>
-                 </div>
-            </header>
-
-            <main className="px-5 relative z-10 flex-1">
+            <main className="px-5 relative z-10 flex-1 pt-[calc(5rem+env(safe-area-inset-top))] pb-28">
                 {children}
             </main>
-            
-            {isLangMenuOpen && (
-                <div className="fixed inset-0 z-20" onClick={() => setIsLangMenuOpen(false)}></div>
-            )}
         </div>
-    )
+    );
 }

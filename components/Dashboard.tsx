@@ -304,7 +304,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                     ) : (
                         <>
                            <div 
-                                onClick={handleAISearch}
+                                onClick={() => navigate('/ask-ai', { state: { query: searchQuery } })}
                                 className="p-4 m-2 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 cursor-pointer flex items-center gap-4 group transition-colors"
                             >
                                 <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
