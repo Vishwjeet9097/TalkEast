@@ -1,14 +1,14 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { db } from '../services/storage';
 import { generateMissingSection } from '../services/gemini';
 import { Course, Chapter, VocabWord, DialogueLine, Language, UserProfile } from '../types';
-import { BookOpen, Volume2, ArrowLeft, Play, RotateCcw, Check, X, Layers, MessageCircle, Mic, Globe, Loader2, PauseCircle, List, Sparkles, ChevronRight, Wand2 } from 'lucide-react';
+import { BookOpen, Volume2, ArrowLeft, Play, RotateCcw, Check, X, Layers, MessageCircle, Mic, Globe, Loader2, PauseCircle, List, Sparkles, ChevronRight, Wand2, Trophy, Star } from 'lucide-react';
 import { useTTS } from '../hooks/useTTS';
 
 export default function CourseView({ profile }: { profile: UserProfile | null }) {
-  const { courseId } = useParams();
+  const { courseId, chapterId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [course, setCourse] = useState<Course | null>(null);
@@ -23,6 +23,9 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [studySessionCompleted, setStudySessionCompleted] = useState(false);
+  const [flashcardCorrectCount, setFlashcardCorrectCount] = useState(0);
+  const [flashcardScore, setFlashcardScore] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Dialogue Playback State
   const [activeDialogueType, setActiveDialogueType] = useState<'short' | 'long'>('short');
@@ -39,12 +42,13 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
         if (found) {
             setCourse(found);
             
-            const state = location.state as { activeChapterId?: string, autoStartStudy?: boolean };
-            
-            if (state?.activeChapterId) {
-                setActiveChapter(state.activeChapterId);
-                if (state.autoStartStudy) {
-                     const ch = found.chapters.find(c => c.id === state.activeChapterId);
+            const state = (location.state || {}) as { activeChapterId?: string, autoStartStudy?: boolean } | null;
+            const initialChapterId = state?.activeChapterId || chapterId;
+
+            if (initialChapterId) {
+                setActiveChapter(initialChapterId);
+                if (state?.autoStartStudy) {
+                     const ch = found.chapters.find(c => c.id === initialChapterId);
                      if (ch && ch.vocab.length > 0) {
                          setIsStudyMode(true);
                      }
@@ -63,11 +67,62 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
     };
   }, [courseId, location.state, cancel]);
 
+  const sortedChapters = useMemo(() => {
+      if (!course) return [];
+      return [...course.chapters].sort((a, b) => a.order - b.order);
+  }, [course]);
+
+  const currentChapter = useMemo(() => {
+      return sortedChapters.find(c => c.id === activeChapter);
+  }, [sortedChapters, activeChapter]);
+
+  const currentVocabList = currentChapter?.vocab || [];
+
+  const nextChapterId = useMemo(() => {
+      if (!activeChapter) return null;
+      const idx = sortedChapters.findIndex(c => c.id === activeChapter);
+      if (idx >= 0 && idx < sortedChapters.length - 1) {
+          return sortedChapters[idx + 1].id;
+      }
+      return null;
+  }, [sortedChapters, activeChapter]);
+
+  const getChapterMeta = (chapter: Chapter) => {
+      return {
+          hasDialogue: (chapter.shortDialogue && chapter.shortDialogue.length > 0) || (chapter.longDialogue && chapter.longDialogue.length > 0),
+          vocabCount: chapter.vocab.length,
+          grammarCount: chapter.grammar.length
+      }
+  };
+
+  useEffect(() => {
+      if (!chapterId || !course) return;
+      const exists = course.chapters.find(c => c.id === chapterId);
+      if (exists && exists.id !== activeChapter) {
+          setActiveChapter(exists.id);
+      }
+  }, [chapterId, course?.id, activeChapter]);
+
+  // Track last access for recency
+  useEffect(() => {
+      if (!course || !activeChapter) return;
+      const target = course.chapters.find(c => c.id === activeChapter);
+      if (!target) return;
+      // Avoid infinite loops: only write when value changes
+      const now = Date.now();
+      if (target.lastAccessed && now - target.lastAccessed < 500) return;
+      const updated = { ...target, lastAccessed: now };
+      const updatedChapters = course.chapters.map(ch => ch.id === updated.id ? updated : ch);
+      const updatedCourse = { ...course, chapters: updatedChapters };
+      setCourse(updatedCourse);
+      db.saveCourse(updatedCourse);
+  }, [activeChapter, course?.id]);
+
   if (!course) return <div className="flex items-center justify-center min-h-[50vh]"><div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div></div>;
 
-  const currentChapter = course.chapters.find(c => c.id === activeChapter);
-  const currentVocabList = currentChapter?.vocab || [];
-  const sortedChapters = [...course.chapters].sort((a, b) => a.order - b.order);
+  if (!chapterId) {
+      return <Navigate to={`/course/${courseId}/index`} replace />;
+  }
 
   const handleGenerateContent = async (type: 'dialogue' | 'grammar' | 'vocab') => {
       if (!course || !currentChapter || !profile) return;
@@ -156,17 +211,32 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           setCurrentCardIndex(0);
           setIsFlipped(false);
           setStudySessionCompleted(false);
+          setFlashcardCorrectCount(0);
+          setFlashcardScore(0);
+          setIsTransitioning(false);
       }
   };
 
   const nextCard = (known: boolean) => {
+      // Prevent rapid clicks and race conditions
+      if (isTransitioning) return;
+      
+      setIsTransitioning(true);
       setIsFlipped(false);
+      
+      // Track correct answers (known = true means "Got it")
+      if (known) {
+          setFlashcardCorrectCount(prev => prev + 1);
+          setFlashcardScore(prev => prev + 10); // 10 points per correct answer
+      }
+      
       setTimeout(() => {
           if (currentCardIndex < currentVocabList.length - 1) {
               setCurrentCardIndex(prev => prev + 1);
           } else {
               setStudySessionCompleted(true);
           }
+          setIsTransitioning(false);
       }, 200);
   };
 
@@ -178,78 +248,166 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   // --- RENDER: FLASHCARD MODE ---
   if (isStudyMode) {
       if (studySessionCompleted) {
+          const accuracy = currentVocabList.length > 0 ? Math.round((flashcardCorrectCount / currentVocabList.length) * 100) : 0;
+          const motivationMessages = [
+              "Amazing work! You're building a strong foundation! 🎯",
+              "Outstanding! Every word you learn brings you closer to fluency! 🌟",
+              "Fantastic! Your dedication is paying off! Keep going! 💪",
+              "Excellent! You're mastering the language one word at a time! 🚀",
+              "Brilliant! Consistency is key, and you're nailing it! ⭐",
+              "Wonderful! Your progress is inspiring! Keep up the momentum! 🎉"
+          ];
+          const motivation = motivationMessages[Math.floor(Math.random() * motivationMessages.length)];
+          
           return (
-              <div className="fixed inset-0 z-50 bg-white dark:bg-slate-900 flex flex-col items-center justify-center p-6 animate-in zoom-in duration-300">
-                  <div className="w-28 h-28 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center text-green-500 mb-6 shadow-xl shadow-green-500/10">
-                      <Check size={56} strokeWidth={4} />
+              <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/60 backdrop-blur-md flex items-start justify-center p-4 pt-16 sm:pt-20 sm:items-center overflow-y-auto">
+                  <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl max-w-md w-full pt-[50px] pb-8 px-8 animate-in zoom-in-95 duration-300 relative border border-white/60 dark:border-white/20 overflow-hidden mt-4 sm:mt-0">
+                      <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
+                      <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-full blur-2xl"></div>
+                      
+                      <div className="relative z-10 text-center">
+                          <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl shadow-yellow-500/30 animate-bounce">
+                              <Trophy size={40} className="text-white" />
+                          </div>
+                          
+                          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-1">Session Complete!</h2>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">{motivation}</p>
+                          
+                          <div className="grid grid-cols-3 gap-3 mb-5">
+                              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-3">
+                                  <div className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400">{flashcardCorrectCount}/{currentVocabList.length}</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Correct</div>
+                              </div>
+                              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-3">
+                                  <div className="text-xl font-extrabold text-purple-600 dark:text-purple-400">{accuracy}%</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Accuracy</div>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3">
+                                  <div className="text-xl font-extrabold text-green-600 dark:text-green-400">+{flashcardScore}</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Points</div>
+                              </div>
+                          </div>
+                          
+                          <button 
+                              onClick={exitStudy} 
+                              className="w-full py-3.5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform text-sm"
+                          >
+                              Back to Lesson
+                          </button>
+                      </div>
                   </div>
-                  <h2 className="text-4xl font-extrabold text-slate-800 dark:text-white mb-2 tracking-tight">Session Complete!</h2>
-                  <p className="text-slate-500 dark:text-slate-400 font-medium mb-10">You reviewed {currentVocabList.length} words.</p>
-                  <button onClick={exitStudy} className="w-full max-w-xs py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform">Back to Lesson</button>
               </div>
           );
       }
       const currentCard = currentVocabList[currentCardIndex];
       return (
-          <div className="fixed inset-0 z-[60] flex flex-col bg-slate-50 dark:bg-slate-900 pb-[env(safe-area-inset-bottom)]">
-              <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] flex justify-between items-center">
-                  <button onClick={exitStudy} className="p-3 bg-white dark:bg-slate-800 shadow-sm rounded-full"><X size={24} className="text-slate-500" /></button>
-                  <div className="flex flex-col items-center">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Studying</span>
-                      <span className="font-bold text-slate-800 dark:text-white">{currentCardIndex + 1} / {currentVocabList.length}</span>
+          <div className="fixed inset-0 z-[60] bg-slate-50 dark:bg-slate-900 overflow-y-auto overscroll-contain">
+              {/* Scrollable Content Container */}
+              <div className="pb-[calc(8rem+env(safe-area-inset-bottom))]">
+                  <div className="p-4 pt-[calc(env(safe-area-inset-top)+1rem)] pb-2 flex justify-between items-center sticky top-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-20 border-b border-slate-200/50 dark:border-slate-700/50">
+                      <button 
+                          onClick={exitStudy} 
+                          className="p-3 bg-white dark:bg-slate-800 shadow-sm rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 z-30"
+                      >
+                          <ArrowLeft size={20} className="text-slate-500" />
+                      </button>
+                      <div className="flex flex-col items-center">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Studying</span>
+                          <span className="font-bold text-slate-800 dark:text-white">{currentCardIndex + 1} / {currentVocabList.length}</span>
+                      </div>
+                      <div className="w-12"></div>
                   </div>
-                  <div className="w-12"></div>
-              </div>
               
-              <div className="w-full px-6 mt-2">
+              <div className="w-full px-6 mt-2 mb-4">
                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${((currentCardIndex + 1) / currentVocabList.length) * 100}%` }}></div>
                  </div>
               </div>
 
-              <div className="flex-1 flex items-center justify-center p-6 perspective-1000">
-                  <div className={`relative w-full max-w-sm aspect-[3/4] transition-all duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
-                      {/* FRONT */}
-                      <div className="absolute inset-0 backface-hidden bg-white dark:bg-slate-800 rounded-[2.5rem] flex flex-col items-center justify-center p-8 shadow-2xl border border-slate-100 dark:border-slate-700">
-                          <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full mb-10">Tap to Reveal</span>
-                          <h2 className="text-5xl font-extrabold text-slate-800 dark:text-white text-center mb-6 leading-tight">{currentCard.original}</h2>
+                  <div className="flex items-center justify-center px-4 py-4 perspective-800">
+                      <div className={`relative w-full max-w-sm min-h-[338px] transition-all duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+                          {/* FRONT - Same structure as back but with front colors */}
+                          <div className="absolute inset-0 backface-hidden bg-white dark:bg-slate-800 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                              {/* Badge at top - matching back structure */}
+                              <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full mb-8">Tap to Reveal</span>
+                              
+                              {/* Reading - matching back structure but hidden/invisible */}
+                              <p className="text-2xl text-slate-400 dark:text-slate-500 font-medium mb-3 text-center h-[32px]"></p>
+                              
+                              {/* Main word - matching back meaning position and size */}
+                          <h2 className="text-5xl font-extrabold text-slate-800 dark:text-white text-center mb-6 leading-tight break-words px-2">{currentCard.original}</h2>
+                              
+                              {/* Example sentence placeholder - matching back structure exactly */}
+                              <div className="mb-6 min-h-[88px] flex items-center justify-center w-full">
+                                  <p className="text-slate-300 dark:text-slate-600 text-sm italic"></p>
+                              </div>
+                              
+                              {/* Sound button in same position as back */}
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} 
-                            className="p-4 bg-slate-50 dark:bg-slate-700 rounded-full text-indigo-600 dark:text-indigo-400 hover:scale-110 transition-transform active:bg-indigo-100"
+                                className="p-4 bg-slate-50 dark:bg-slate-700 rounded-full text-indigo-600 dark:text-indigo-400 hover:scale-110 transition-transform active:bg-indigo-100 shadow-md"
                           >
                              {playingText === currentCard.original && audioState === 'LOADING' ? <Loader2 size={24} className="animate-spin" /> : <Volume2 size={28} />}
                           </button>
                       </div>
                       {/* BACK */}
-                      <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] flex flex-col items-center justify-center p-8 rotate-y-180 shadow-2xl text-white relative overflow-hidden">
+                          <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 rotate-y-180 shadow-2xl text-white relative overflow-hidden">
                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
                            <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
 
-                          <button onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} className="absolute top-6 right-6 p-3 bg-white/20 rounded-full hover:bg-white/30 backdrop-blur-md">
-                              <Volume2 size={20} className="text-white" />
-                          </button>
-                          
-                          {currentCard.partOfSpeech && (
-                              <span className="mb-4 px-3 py-1 bg-white/20 backdrop-blur-md text-white/90 text-xs font-bold rounded-lg uppercase tracking-wider">
-                                  {currentCard.partOfSpeech}
-                              </span>
-                          )}
-                          
-                          <p className="text-2xl text-white/80 font-medium mb-3">{currentCard.reading}</p>
-                          <h3 className="text-4xl font-extrabold text-white text-center mb-8">{currentCard.meaning}</h3>
-                          
-                          {currentCard.exampleSentence && (
-                              <div className="bg-black/20 backdrop-blur-md p-5 rounded-2xl w-full border border-white/10">
-                                  <p className="text-white/90 text-center italic text-lg">"{currentCard.exampleSentence}"</p>
-                              </div>
-                          )}
+                              {/* Match exact structure and spacing as front */}
+                              {currentCard.partOfSpeech ? (
+                                  <span className="text-xs font-bold text-white/90 uppercase tracking-widest bg-white/20 backdrop-blur-md px-3 py-1 rounded-full mb-8">{currentCard.partOfSpeech}</span>
+                              ) : (
+                                  <span className="text-xs font-bold text-transparent uppercase tracking-widest px-3 py-1 rounded-full mb-8">Placeholder</span>
+                              )}
+                              
+                              <p className="text-2xl text-white/80 font-medium mb-3 text-center break-words px-2">{currentCard.reading}</p>
+                              <h3 className="text-5xl font-extrabold text-white text-center mb-6 leading-tight break-words px-2">{currentCard.meaning}</h3>
+                              
+                              {currentCard.exampleSentence ? (
+                                  <div className="bg-black/20 backdrop-blur-md p-5 rounded-2xl w-full border border-white/10 mb-6">
+                                      <p className="text-white/90 text-center italic text-lg leading-relaxed break-words">"{currentCard.exampleSentence}"</p>
+                                  </div>
+                              ) : (
+                                  <div className="mb-6 min-h-[88px] flex items-center justify-center">
+                                      <p className="text-white/50 text-sm italic">No example sentence</p>
+                                  </div>
+                              )}
+                              
+                              {/* Sound button in same position as front */}
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} 
+                                className="p-4 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 hover:scale-110 transition-transform active:bg-white/40 shadow-lg"
+                              >
+                                 {playingText === currentCard.original && audioState === 'LOADING' ? <Loader2 size={24} className="animate-spin" /> : <Volume2 size={28} />}
+                              </button>
+                          </div>
                       </div>
                   </div>
-              </div>
-              
-              <div className="p-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] flex justify-between items-center gap-6 max-w-md mx-auto w-full">
-                  <button onClick={(e) => { e.stopPropagation(); nextCard(false); }} className="h-16 flex-1 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all border border-red-100 dark:border-red-900/30"><RotateCcw size={20} /><span className="text-[10px] uppercase tracking-wide">Again</span></button>
-                   <button onClick={(e) => { e.stopPropagation(); nextCard(true); }} className="h-16 flex-1 rounded-2xl bg-green-50 dark:bg-green-900/20 text-green-600 font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all border border-green-100 dark:border-green-900/30"><Check size={20} /><span className="text-[10px] uppercase tracking-wide">Got it</span></button>
+                  
+                  {/* Action Buttons - Positioned just below card, above bottom nav */}
+                  <div className="px-4 py-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+                      <div className="max-w-sm mx-auto w-full flex justify-between items-center gap-3">
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); nextCard(false); }} 
+                              disabled={isTransitioning}
+                              className="flex-1 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-orange-500/30 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-white"
+                              style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' }}
+                          >
+                              <RotateCcw size={18} strokeWidth={2.5} />
+                              <span>Again</span>
+                          </button>
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); nextCard(true); }} 
+                              disabled={isTransitioning}
+                              className="btn-primary flex-1 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                              <Check size={18} strokeWidth={2.5} />
+                              <span>Got it</span>
+                          </button>
+                      </div>
+                  </div>
               </div>
           </div>
       );
@@ -303,12 +461,32 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
             <button onClick={() => navigate('/dashboard')} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><ArrowLeft size={20} /></button>
             <h2 className="text-xl font-bold truncate text-slate-800 dark:text-white max-w-[200px]">{course.title}</h2>
           </div>
+          <div className="flex items-center gap-2">
+              <button 
+                 onClick={() => navigate(`/course/${courseId}/index`)}
+                 className="hidden sm:inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 transition-colors border border-slate-200 dark:border-slate-700"
+              >
+                 <BookOpen size={16} /> Index page
+              </button>
+              {nextChapterId && (
+                  <button
+                    onClick={() => {
+                        stopPlayback();
+                        setActiveChapter(nextChapterId);
+                        navigate(`/course/${courseId}/chapter/${nextChapterId}`, { replace: true });
+                    }}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-sm"
+                  >
+                    Next chapter <ChevronRight size={14} />
+                  </button>
+              )}
           <button 
             onClick={() => setShowTableOfContents(true)}
             className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-full text-slate-600 dark:text-slate-300 hover:text-indigo-600 flex items-center justify-center transition-colors"
           >
               <List size={20} />
           </button>
+          </div>
       </div>
 
       {currentChapter && (
@@ -433,7 +611,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                              </div>
                         ) : (
                             <>
-                                <div className="flex justify-end mb-6">
+                                <div className="flex justify-center mb-6">
                                     <button onClick={startStudy} className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform">
                                         <Play size={18} fill="currentColor" /> Start Flashcards
                                     </button>

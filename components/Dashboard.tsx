@@ -1,9 +1,9 @@
 
-import React, { useEffect, useState } from 'react';
-import { UserProfile, Course, Chapter, Language, ProcessingJob, SearchResult } from '../types';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { UserProfile, Course, Chapter, Language, ProcessingJob, SearchResult, UserStats, PracticeHistory } from '../types';
 import { db } from '../services/storage';
 import { useNavigate } from 'react-router-dom';
-import { Book, GraduationCap, ChevronRight, Plus, Flame, Trophy, Clock, ArrowRight, BookOpen, Layers, Zap, PlayCircle, Lightbulb, Sparkles, Search, X, Loader2, Play, Pause, Trash2, AlertTriangle, RefreshCw, Globe, Wand2 } from 'lucide-react';
+import { Book, GraduationCap, ChevronRight, Plus, Flame, Trophy, Clock, ArrowRight, BookOpen, Layers, Zap, PlayCircle, Lightbulb, Sparkles, Search, X, Loader2, Play, Pause, Trash2, AlertTriangle, RefreshCw, Globe, Wand2, Star, History } from 'lucide-react';
 import { useProcessing } from '../context/ProcessingContext';
 import { searchWordMeaning } from '../services/gemini';
 
@@ -11,6 +11,10 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
   const [courses, setCourses] = useState<Course[]>([]);
   const [jobs, setJobs] = useState<ProcessingJob[]>([]);
   const [recentChapters, setRecentChapters] = useState<{course: Course, chapter: Chapter}[]>([]);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+  const [practiceHistory, setPracticeHistory] = useState<PracticeHistory[]>([]);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredResults, setFilteredResults] = useState<{ type: 'course'|'chapter'|'word', title: string, subtitle?: string, id: string, courseId?: string, chapterId?: string }[]>([]);
@@ -20,42 +24,105 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
 
   const navigate = useNavigate();
   const { resumeJob, pauseJob, deleteJob, activeJobId, state: processingState } = useProcessing();
+  const prevDataRef = useRef<{courses: string, chapters: string, jobs: string, stats: string}>({courses: '', chapters: '', jobs: '', stats: ''});
 
-  const loadData = async () => {
-      const data = await db.getCourses();
-      const filteredCourses = data.filter(c => {
-          if (c.targetLanguage) {
-              return c.targetLanguage === profile?.targetLanguage;
-          }
+  // Helper to check if data actually changed
+  const hasDataChanged = (newData: any, oldData: string, key: string): boolean => {
+      const newStr = JSON.stringify(newData);
+      if (newStr !== oldData) {
+          prevDataRef.current[key as keyof typeof prevDataRef.current] = newStr;
           return true;
-      });
-      filteredCourses.sort((a, b) => {
-          if (a.processingJobId && !b.processingJobId) return -1;
-          if (!a.processingJobId && b.processingJobId) return 1;
-          return 0; 
-      });
-      setCourses(filteredCourses);
-      
-      const chaptersList: {course: Course, chapter: Chapter}[] = [];
-      filteredCourses.forEach(c => {
-          c.chapters.forEach(ch => {
-              if (ch.vocab.length > 0) {
-                  chaptersList.push({ course: c, chapter: ch });
-              }
-          });
-      });
-      setRecentChapters(chaptersList.slice(0, 5));
-
-      const allJobs = await db.getAllJobs();
-      const activeJobs = allJobs.filter(j => j.status !== 'completed').sort((a,b) => b.updatedAt - a.updatedAt);
-      setJobs(activeJobs);
+      }
+      return false;
   };
 
+  const loadData = useCallback(async () => {
+      try {
+          const data = await db.getCourses();
+          const filteredCourses = data.filter(c => {
+              if (c.targetLanguage) {
+                  return c.targetLanguage === profile?.targetLanguage;
+              }
+              return true;
+          });
+          filteredCourses.sort((a, b) => {
+              if (a.processingJobId && !b.processingJobId) return -1;
+              if (!a.processingJobId && b.processingJobId) return 1;
+              return 0; 
+          });
+          
+          // Only update if courses actually changed
+          if (hasDataChanged(filteredCourses, prevDataRef.current.courses, 'courses')) {
+              setCourses(filteredCourses);
+          }
+          
+          const chaptersList: {course: Course, chapter: Chapter}[] = [];
+          filteredCourses.forEach(c => {
+              c.chapters.forEach(ch => {
+                  // Only include chapters that have vocab (for Jump Back In)
+                  if (ch.vocab.length > 0) {
+                      chaptersList.push({ course: c, chapter: ch });
+                  }
+              });
+          });
+          
+          // Recency: lastAccessed desc; fallback to earliest chapters to fill 3 slots
+          const withAccess = [...chaptersList].sort((a, b) => {
+              const aTime = a.chapter.lastAccessed ?? 0;
+              const bTime = b.chapter.lastAccessed ?? 0;
+              if (aTime === bTime) return a.chapter.order - b.chapter.order;
+              return bTime - aTime;
+          });
+          const picked: {course: Course, chapter: Chapter}[] = [];
+          for (const item of withAccess) {
+              if (picked.length >= 3) break;
+              picked.push(item);
+          }
+          if (picked.length < 3) {
+              const byOrder = [...chaptersList].sort((a, b) => a.chapter.order - b.chapter.order);
+              for (const item of byOrder) {
+                  if (picked.length >= 3) break;
+                  if (!picked.find(p => p.chapter.id === item.chapter.id)) picked.push(item);
+              }
+          }
+          
+          // Only update if chapters actually changed
+          if (hasDataChanged(picked, prevDataRef.current.chapters, 'chapters')) {
+              setRecentChapters(picked);
+          }
+
+          const allJobs = await db.getAllJobs();
+          const activeJobs = allJobs.filter(j => j.status !== 'completed').sort((a,b) => b.updatedAt - a.updatedAt);
+          
+          // Only update if jobs actually changed
+          if (hasDataChanged(activeJobs, prevDataRef.current.jobs, 'jobs')) {
+              setJobs(activeJobs);
+          }
+
+          const userStats = await db.getStats();
+          
+          // Only update if stats actually changed
+          if (hasDataChanged(userStats, prevDataRef.current.stats, 'stats')) {
+              setStats(userStats);
+          }
+      } catch (error) {
+          console.error('Error loading data:', error);
+      }
+  }, [profile?.targetLanguage]);
+
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 2000);
-    return () => clearInterval(interval);
-  }, [profile?.targetLanguage, processingState]);
+      setIsLoading(true);
+      loadData().finally(() => setIsLoading(false));
+      
+      // Only poll for updates if processing, otherwise check less frequently
+      const pollInterval = processingState === 'processing' ? 3000 : 10000; // 3s if processing, 10s otherwise
+      
+      const interval = setInterval(() => {
+          loadData();
+      }, pollInterval);
+      
+      return () => clearInterval(interval);
+  }, [loadData, processingState]);
 
   useEffect(() => {
       if (!searchQuery.trim()) {
@@ -171,6 +238,40 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">{profile?.targetLanguage || 'a new language'}?</span>
             </h2>
         </div>
+
+        {/* Stats Cards */}
+        {stats && (
+            <div className="grid grid-cols-3 gap-3">
+                <div className="glass-panel p-4 rounded-2xl border border-white/60 dark:border-slate-700 text-center relative group">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                        <Trophy size={16} className="text-yellow-500" />
+                        <span className="text-lg font-extrabold text-slate-900 dark:text-white">{stats.todayHighScore}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Today's High Score</p>
+                </div>
+                <div className="glass-panel p-4 rounded-2xl border border-white/60 dark:border-slate-700 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                        <Star size={16} className="text-indigo-500" />
+                        <span className="text-lg font-extrabold text-slate-900 dark:text-white">{stats.streakDays}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Day Streak</p>
+                </div>
+                <button 
+                    onClick={async () => {
+                        const history = await db.getPracticeHistory(50);
+                        setPracticeHistory(history);
+                        setShowHistory(true);
+                    }}
+                    className="glass-panel p-4 rounded-2xl border border-white/60 dark:border-slate-700 text-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group"
+                >
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                        <History size={16} className="text-purple-500 group-hover:text-indigo-600 transition-colors" />
+                        <span className="text-lg font-extrabold text-slate-900 dark:text-white">{stats.totalWordsReviewed}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Words Reviewed</p>
+                </button>
+            </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative z-20 group">
@@ -295,7 +396,11 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
         </div>
         
         <div className="flex gap-4 overflow-x-auto pb-6 -mx-5 px-5 no-scrollbar snap-x snap-mandatory">
-            {recentChapters.length > 0 ? (
+            {isLoading ? (
+                <div className="w-full h-32 glass-panel rounded-3xl flex items-center justify-center">
+                    <Loader2 size={24} className="animate-spin text-indigo-600" />
+                </div>
+            ) : recentChapters.length > 0 ? (
                 recentChapters.map(({course, chapter}, idx) => (
                      <button 
                         key={`${course.id}-${chapter.id}`}
@@ -346,7 +451,12 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
             </button>
         </div>
 
-        {courses.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-16 glass-panel rounded-[2.5rem] flex flex-col items-center">
+            <Loader2 size={32} className="animate-spin text-indigo-600 mb-4" />
+            <p className="text-slate-500 text-sm">Loading your library...</p>
+          </div>
+        ) : courses.length === 0 ? (
           <div className="text-center py-16 glass-panel rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center">
             <div className="w-20 h-20 bg-indigo-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-inner">
                 <Book className="h-8 w-8 text-indigo-400" />
@@ -402,6 +512,82 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
           </div>
         )}
       </div>
+
+      {/* Practice History Modal */}
+      {showHistory && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowHistory(false)}>
+              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-300 relative border border-white/20" onClick={e => e.stopPropagation()}>
+                  <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
+                      <div>
+                          <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">Practice History</h3>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Recent attempts and scores</p>
+                      </div>
+                      <button 
+                          onClick={() => setShowHistory(false)}
+                          className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"
+                      >
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                      {practiceHistory.length > 0 ? (
+                          practiceHistory.map((entry) => {
+                              const date = new Date(entry.timestamp);
+                              const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                              const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                              
+                              return (
+                                  <div 
+                                      key={entry.id}
+                                      className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                                  >
+                                      <div className="flex items-center justify-between mb-2">
+                                          <div className="flex items-center gap-2">
+                                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase ${
+                                                  entry.type === 'daily-review' 
+                                                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                                      : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                                              }`}>
+                                                  {entry.type === 'daily-review' ? 'Daily Review' : entry.type}
+                                              </span>
+                                              <span className="text-xs text-slate-500 dark:text-slate-400">{dateStr} • {timeStr}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                              <Trophy size={14} className="text-yellow-500" />
+                                              <span className="text-sm font-bold text-slate-900 dark:text-white">{entry.score}</span>
+                                          </div>
+                                      </div>
+                                      <div className="grid grid-cols-3 gap-2 mt-2">
+                                          <div>
+                                              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">Accuracy</p>
+                                              <p className="text-sm font-bold text-slate-900 dark:text-white">{entry.accuracy}%</p>
+                                          </div>
+                                          <div>
+                                              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">Correct</p>
+                                              <p className="text-sm font-bold text-slate-900 dark:text-white">{entry.correctCount}/{entry.totalCount}</p>
+                                          </div>
+                                          {entry.duration && (
+                                              <div>
+                                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">Time</p>
+                                                  <p className="text-sm font-bold text-slate-900 dark:text-white">{entry.duration}s</p>
+                                              </div>
+                                          )}
+                                      </div>
+                                  </div>
+                              );
+                          })
+                      ) : (
+                          <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                              <History size={48} className="mx-auto mb-4 opacity-50" />
+                              <p className="text-sm font-medium">No practice history yet</p>
+                              <p className="text-xs mt-1">Complete practice sessions to see your progress</p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 }

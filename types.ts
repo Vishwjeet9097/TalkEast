@@ -16,6 +16,30 @@ export interface UserProfile {
   useEnvKey?: boolean;
 }
 
+export interface UserStats {
+  id: string;
+  todayHighScore: number; // Highest score achieved today
+  dailyReviewCompleted: boolean; // Whether daily review is done today
+  lastReviewDate: string; // YYYY-MM-DD format
+  totalWordsReviewed: number;
+  streakDays: number;
+  lastActivity: number; // Timestamp
+}
+
+export interface PracticeHistory {
+  id: string;
+  date: string; // YYYY-MM-DD format
+  timestamp: number;
+  type: 'daily-review' | 'vocab' | 'grammar' | 'listening' | 'reading';
+  score: number;
+  correctCount: number;
+  totalCount: number;
+  accuracy: number; // percentage
+  duration?: number; // in seconds
+  courseId?: string;
+  courseTitle?: string;
+}
+
 export interface DialogueLine {
   speaker: string;
   text: string;
@@ -52,6 +76,7 @@ export interface Chapter {
   title: string;
   courseId: string;
   order: number;
+  lastAccessed?: number;
   // Content Sections
   shortDialogue?: DialogueLine[];
   longDialogue?: DialogueLine[];

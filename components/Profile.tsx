@@ -167,54 +167,49 @@ const Profile = ({ profile, onUpdateProfile }: ProfileProps) => {
         </div>
 
         {/* API Key Source */}
-        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 p-5 bg-gradient-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 shadow-xl space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-slate-800 text-indigo-600 flex items-center justify-center">
-                <KeyRound size={18} />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Gemini API Key</p>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Choose key source</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">कस्टम कुंजी तभी उपयोग होगी जब आप Custom मोड चुनें.</p>
-              </div>
+        <div className="rounded-2xl border border-slate-100 dark:border-slate-800 p-4 bg-white/70 dark:bg-slate-800/60 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-slate-800 text-indigo-600 flex items-center justify-center">
+              <KeyRound size={18} />
             </div>
-            <div className={`px-3 py-1.5 rounded-full text-[11px] font-bold border ${useEnvKey ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 border-slate-200 dark:border-slate-700' : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-800'}`}>
-              {useEnvKey ? '.env.local active' : 'Custom key active'}
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">API Key</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Choose Gemini key source</p>
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => handleToggleSource(true)}
               disabled={!profile}
-              className={`group w-full text-left p-4 rounded-2xl border transition-all active:scale-95 disabled:opacity-60 ${
+              className={`px-3 py-2 rounded-full text-sm font-semibold border transition-all active:scale-95 disabled:opacity-60 ${
                 useEnvKey
-                  ? 'border-indigo-200 dark:border-indigo-700 bg-indigo-50/70 dark:bg-indigo-900/20 shadow-sm'
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-500/60'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/30'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-500/60'
               }`}
             >
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Default</p>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Use .env.local</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">डिप्लॉय पर भी यही स्रोत उपयोग होगा.</p>
+              Use .env.local
             </button>
             <button
               onClick={() => handleToggleSource(false)}
               disabled={!profile}
-              className={`group w-full text-left p-4 rounded-2xl border transition-all active:scale-95 disabled:opacity-60 ${
+              className={`px-3 py-2 rounded-full text-sm font-semibold border transition-all active:scale-95 disabled:opacity-60 ${
                 !useEnvKey
-                  ? 'border-indigo-200 dark:border-indigo-700 bg-indigo-50/70 dark:bg-indigo-900/20 shadow-sm'
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-500/60'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/30'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-500/60'
               }`}
             >
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Override</p>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Use Custom Key</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">कुंजी ब्राउज़र में ही सुरक्षित रहेगी.</p>
+              Custom Key
             </button>
+            {hasSavedKey && (
+              <span className="px-3 py-2 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300">
+                Saved
+              </span>
+            )}
           </div>
 
           {!useEnvKey && (
-            <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/60 p-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   {hasSavedKey ? 'Custom key saved' : 'Enter custom key'}

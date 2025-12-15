@@ -1,22 +1,38 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, Course, PracticeType, PracticeItem } from '../types';
+import { UserProfile, Course, PracticeType, PracticeItem, VocabWord, UserStats, PracticeHistory } from '../types';
 import { db } from '../services/storage';
 import { generatePracticeSession, explainGrammarMistake } from '../services/gemini';
 import { useTTS } from '../hooks/useTTS';
 import { 
     BrainCircuit, BookOpen, Ear, MessageSquare, ArrowLeft, 
     Play, CheckCircle2, XCircle, Loader2, Volume2, HelpCircle, 
-    RefreshCcw, Sparkles 
+    RefreshCcw, Sparkles, Trophy, X, ChevronRight, Wand2, Star
 } from 'lucide-react';
 
 interface Props {
     profile: UserProfile | null;
 }
 
+const MOTIVATION_MESSAGES = [
+    "Amazing work! You're building a strong foundation! 🎯",
+    "Outstanding! Every word you learn brings you closer to fluency! 🌟",
+    "Fantastic! Your dedication is paying off! Keep going! 💪",
+    "Excellent! You're mastering the language one word at a time! 🚀",
+    "Brilliant! Consistency is key, and you're nailing it! ⭐",
+    "Wonderful! Your progress is inspiring! Keep up the momentum! 🎉"
+];
+
 export default function PracticeHub({ profile }: Props) {
     const [activeMode, setActiveMode] = useState<PracticeType | null>(null);
     const [courses, setCourses] = useState<Course[]>([]);
+    const [stats, setStats] = useState<UserStats | null>(null);
+    const [showCourseSelection, setShowCourseSelection] = useState(false);
+    const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+    const [isDailyReview, setIsDailyReview] = useState(false);
+    const [sessionCompleted, setSessionCompleted] = useState(false);
+    const [sessionScore, setSessionScore] = useState(0);
+    const [correctCount, setCorrectCount] = useState(0);
     
     // Session State
     const [items, setItems] = useState<PracticeItem[]>([]);
@@ -33,12 +49,116 @@ export default function PracticeHub({ profile }: Props) {
         const load = async () => {
             const data = await db.getCourses();
             setCourses(data);
+            const userStats = await db.getStats();
+            setStats(userStats);
         };
         load();
     }, []);
 
-    const startPractice = async (type: PracticeType) => {
+    const hasCourseContent = (): boolean => {
+        // Filter by target language and check for content
+        return courses.some(c => {
+            const languageMatch = !c.targetLanguage || c.targetLanguage === profile?.targetLanguage;
+            const hasContent = c.chapters.some(ch => ch.vocab.length > 0);
+            return languageMatch && hasContent;
+        });
+    };
+
+    const collectWordsFromCourses = (): VocabWord[] => {
+        const allWords: VocabWord[] = [];
+        // Filter courses by target language
+        const filteredCourses = courses.filter(c => 
+            !c.targetLanguage || c.targetLanguage === profile?.targetLanguage
+        );
+        filteredCourses.forEach(course => {
+            course.chapters.forEach(chapter => {
+                allWords.push(...chapter.vocab);
+            });
+        });
+        return allWords;
+    };
+
+    const startDailyReview = async () => {
         if (!profile) return;
+        
+        const allWords = collectWordsFromCourses();
+        if (allWords.length === 0) {
+            alert("No words found in your courses. Please add content first.");
+            return;
+        }
+
+        // Shuffle and pick 10 words
+        const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+        const selectedWords = shuffled.slice(0, Math.min(10, shuffled.length));
+
+        // Convert to PracticeItems - filter out words without meanings
+        const validWords = selectedWords.filter(w => w.meaning && w.meaning.trim());
+        const practiceItems: PracticeItem[] = validWords.map((word, idx) => {
+            const distractors = generateDistractors(word.meaning, allWords);
+            return {
+                id: `daily-${idx}`,
+                type: 'vocab' as PracticeType,
+                question: `What does "${word.original}" mean?`,
+                correctAnswer: word.meaning,
+                possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'], // Ensure 4 options
+                audioText: word.original,
+                explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+            };
+        });
+
+        setIsDailyReview(true);
+        setActiveMode('vocab');
+        setItems(practiceItems);
+        setCurrentIndex(0);
+        setFeedback('idle');
+        setUserInput('');
+        setCorrectCount(0);
+        setSessionScore(0);
+        setSessionCompleted(false);
+        setSessionStartTime(Date.now());
+    };
+
+    const generateDistractors = (correct: string, allWords: VocabWord[]): string[] => {
+        // Get unique wrong answers
+        const uniqueMeanings = new Set<string>();
+        allWords.forEach(w => {
+            if (w.meaning && w.meaning.trim() && w.meaning !== correct) {
+                uniqueMeanings.add(w.meaning);
+            }
+        });
+        
+        const wrongArray = Array.from(uniqueMeanings).sort(() => Math.random() - 0.5);
+        
+        // Ensure we have at least 3 wrong options, if not enough words, use generic options
+        let wrong: string[] = [];
+        if (wrongArray.length >= 3) {
+            wrong = wrongArray.slice(0, 3);
+        } else if (wrongArray.length > 0) {
+            // If we have some but not enough, repeat to fill
+            wrong = [...wrongArray];
+            while (wrong.length < 3 && wrongArray.length > 0) {
+                wrong.push(...wrongArray.slice(0, 3 - wrong.length));
+            }
+            wrong = wrong.slice(0, 3);
+        } else {
+            // Fallback generic options if no words available
+            wrong = ['Option A', 'Option B', 'Option C'];
+        }
+        
+        const options = [correct, ...wrong].sort(() => Math.random() - 0.5);
+        return options.slice(0, 4); // Ensure exactly 4 options
+    };
+
+    const startPractice = async (type: PracticeType, fromCourse?: Course) => {
+        if (!profile) return;
+
+        // Check if we should ask for course selection
+        if (hasCourseContent() && !fromCourse) {
+            setShowCourseSelection(true);
+            setActiveMode(type);
+            return;
+        }
+
         setActiveMode(type);
         setIsLoading(true);
         setItems([]);
@@ -46,20 +166,57 @@ export default function PracticeHub({ profile }: Props) {
         setFeedback('idle');
         setUserInput('');
         setAiExplanation(null);
+        setCorrectCount(0);
+        setSessionScore(0);
+        setSessionCompleted(false);
+        setIsDailyReview(false);
+        setSessionStartTime(Date.now());
 
         try {
-            // Context heuristic: Pick a random course title or topic
-            const context = courses.length > 0 
-                ? courses[Math.floor(Math.random() * courses.length)].title 
-                : 'General Daily Conversation';
+            let generatedItems: PracticeItem[] = [];
 
-            const generatedItems = await generatePracticeSession(
-                type, 
-                profile.targetLanguage, 
-                profile.nativeLanguage, 
-                context,
-                profile
-            );
+            if (fromCourse && type === 'vocab') {
+                // Use course vocabulary
+                const allWords: VocabWord[] = [];
+                fromCourse.chapters.forEach(ch => {
+                    allWords.push(...ch.vocab.filter(w => w.meaning && w.meaning.trim())); // Filter out empty meanings
+                });
+                
+                if (allWords.length > 0) {
+                    const shuffled = [...allWords].sort(() => Math.random() - 0.5);
+                    const selected = shuffled.slice(0, Math.min(10, shuffled.length));
+                    generatedItems = selected.map((word, idx) => {
+                        const distractors = generateDistractors(word.meaning, allWords);
+                        return {
+                            id: `course-${idx}`,
+                            type: 'vocab' as PracticeType,
+                            question: `What does "${word.original}" mean?`,
+                            correctAnswer: word.meaning,
+                            possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'], // Ensure 4 options
+                            audioText: word.original,
+                            explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+                        };
+                    });
+                }
+            }
+
+            // If no course content or not vocab, use AI
+            if (generatedItems.length === 0) {
+                const context = fromCourse 
+                    ? fromCourse.title 
+                    : courses.length > 0 
+                        ? courses[Math.floor(Math.random() * courses.length)].title 
+                        : 'General Daily Conversation';
+
+                generatedItems = await generatePracticeSession(
+                    type, 
+                    profile.targetLanguage, 
+                    profile.nativeLanguage, 
+                    context,
+                    profile
+                );
+            }
+
             setItems(generatedItems);
         } catch (e) {
             console.error(e);
@@ -75,6 +232,11 @@ export default function PracticeHub({ profile }: Props) {
         const isCorrect = normalize(userInput) === normalize(currentItem.correctAnswer);
         setFeedback(isCorrect ? 'correct' : 'incorrect');
         
+        if (isCorrect) {
+            setCorrectCount(prev => prev + 1);
+            setSessionScore(prev => prev + 10);
+        }
+        
         // Auto-play audio if correct for listening/reading
         if (isCorrect && currentItem.audioText) {
             speak(currentItem.audioText, profile?.targetLanguage);
@@ -87,6 +249,11 @@ export default function PracticeHub({ profile }: Props) {
         const currentItem = items[currentIndex];
         const isCorrect = choice === currentItem.correctAnswer;
         setFeedback(isCorrect ? 'correct' : 'incorrect');
+        
+        if (isCorrect) {
+            setCorrectCount(prev => prev + 1);
+            setSessionScore(prev => prev + 10);
+        }
         
         if (isCorrect && currentItem.audioText) {
              speak(currentItem.audioText, profile?.targetLanguage);
@@ -114,20 +281,255 @@ export default function PracticeHub({ profile }: Props) {
         }
     };
 
-    const nextQuestion = () => {
+    const nextQuestion = async () => {
         if (currentIndex < items.length - 1) {
             setCurrentIndex(prev => prev + 1);
             setFeedback('idle');
             setUserInput('');
             setAiExplanation(null);
         } else {
-            // End of session
-            alert("Great job! Session complete.");
-            setActiveMode(null);
+            // End of session - save history and update stats
+            const today = new Date().toISOString().split('T')[0];
+            const accuracy = items.length > 0 ? Math.round((correctCount / items.length) * 100) : 0;
+            const duration = sessionStartTime > 0 ? Math.round((Date.now() - sessionStartTime) / 1000) : 0;
+            
+            // Save practice history
+            const history: PracticeHistory = {
+                id: crypto.randomUUID(),
+                date: today,
+                timestamp: Date.now(),
+                type: isDailyReview ? 'daily-review' : activeMode || 'vocab',
+                score: sessionScore,
+                correctCount: correctCount,
+                totalCount: items.length,
+                accuracy: accuracy,
+                duration: duration
+            };
+            await db.savePracticeHistory(history);
+            
+            // Update stats
+            const updatedStats = stats ? { ...stats } : await db.getStats();
+            const todayDate = new Date().toISOString().split('T')[0];
+            
+            // Update high score (only if higher than current)
+            if (sessionScore > updatedStats.todayHighScore) {
+                updatedStats.todayHighScore = sessionScore;
+            }
+            
+            updatedStats.totalWordsReviewed += items.length;
+            updatedStats.lastActivity = Date.now();
+            
+            if (isDailyReview) {
+                updatedStats.dailyReviewCompleted = true;
+                // Streak logic: increment if same day, reset if new day
+                if (updatedStats.lastReviewDate === todayDate) {
+                    // Same day - don't change streak
+                } else {
+                    // New day - check if yesterday was completed
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    const yesterdayStr = yesterday.toISOString().split('T')[0];
+                    
+                    if (updatedStats.lastReviewDate === yesterdayStr) {
+                        // Consecutive day - increment streak
+                        updatedStats.streakDays = (updatedStats.streakDays || 0) + 1;
+                    } else {
+                        // Streak broken - reset to 1
+                        updatedStats.streakDays = 1;
+                    }
+                }
+                updatedStats.lastReviewDate = todayDate;
+            }
+            
+            await db.saveStats(updatedStats);
+            setStats(updatedStats);
+            setSessionCompleted(true);
         }
     };
 
     const normalize = (str: string) => str.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
+
+    const handleCloseSession = () => {
+        setActiveMode(null);
+        setSessionCompleted(false);
+        setItems([]);
+        setCurrentIndex(0);
+        setCorrectCount(0);
+        setSessionScore(0);
+        setIsDailyReview(false);
+    };
+
+    // Congratulation Card
+    if (sessionCompleted) {
+        const accuracy = items.length > 0 ? Math.round((correctCount / items.length) * 100) : 0;
+        const motivation = MOTIVATION_MESSAGES[Math.floor(Math.random() * MOTIVATION_MESSAGES.length)];
+        
+        return (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full p-8 animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
+                    
+                    <div className="relative z-10 text-center">
+                        <div className="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-yellow-500/30 animate-bounce">
+                            <Trophy size={48} className="text-white" />
+                        </div>
+                        
+                        <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Session Complete!</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mb-6">{motivation}</p>
+                        
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4">
+                                <div className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">{correctCount}/{items.length}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Correct</div>
+                            </div>
+                            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4">
+                                <div className="text-2xl font-extrabold text-purple-600 dark:text-purple-400">{accuracy}%</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Accuracy</div>
+                            </div>
+                            <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4">
+                                <div className="text-2xl font-extrabold text-green-600 dark:text-green-400">+{sessionScore}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Points</div>
+                            </div>
+                        </div>
+                        
+                        {isDailyReview && (
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-4 mb-6 border border-indigo-100 dark:border-indigo-800">
+                                <div className="flex items-center justify-center gap-2 mb-2">
+                                    <Star className="text-yellow-500 fill-yellow-500" size={20} />
+                                    <span className="font-bold text-slate-800 dark:text-white">Daily Review Complete!</span>
+                                </div>
+                                <p className="text-sm text-slate-600 dark:text-slate-300">
+                                    {stats?.streakDays || 0} day streak 🔥
+                                </p>
+                            </div>
+                        )}
+                        
+                        <div className="flex gap-3">
+                            {isDailyReview && (
+                                <button 
+                                    onClick={() => {
+                                        setSessionCompleted(false);
+                                        setCurrentIndex(0);
+                                        setCorrectCount(0);
+                                        setSessionScore(0);
+                                        setFeedback('idle');
+                                        setUserInput('');
+                                        setAiExplanation(null);
+                                        // Reset items to restart
+                                        const allWords = collectWordsFromCourses();
+                                        if (allWords.length > 0) {
+                                            const validWords = allWords.filter(w => w.meaning && w.meaning.trim());
+                                            const shuffled = [...validWords].sort(() => Math.random() - 0.5);
+                                            const selectedWords = shuffled.slice(0, Math.min(10, shuffled.length));
+                                            const practiceItems: PracticeItem[] = selectedWords.map((word, idx) => {
+                                                const distractors = generateDistractors(word.meaning, allWords);
+                                                return {
+                                                    id: `daily-retry-${idx}`,
+                                                    type: 'vocab' as PracticeType,
+                                                    question: `What does "${word.original}" mean?`,
+                                                    correctAnswer: word.meaning,
+                                                    possibleAnswers: distractors.length >= 4 ? distractors : [...distractors, 'Not sure'],
+                                                    audioText: word.original,
+                                                    explanation: word.exampleSentence || `"${word.original}" means "${word.meaning}"`
+                                                };
+                                            });
+                                            setItems(practiceItems);
+                                            setSessionStartTime(Date.now());
+                                        }
+                                    }}
+                                    className="flex-1 py-4 bg-purple-600 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30 hover:scale-105 transition-transform"
+                                >
+                                    Reattempt
+                                </button>
+                            )}
+                            <button 
+                                onClick={handleCloseSession}
+                                className={`${isDailyReview ? 'flex-1' : 'w-full'} py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform`}
+                            >
+                                Continue Learning
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Course Selection Modal
+    if (showCourseSelection && activeMode) {
+        // Filter by target language and content
+        const coursesWithContent = courses.filter(c => {
+            // Match target language
+            const languageMatch = !c.targetLanguage || c.targetLanguage === profile?.targetLanguage;
+            // Has vocabulary content
+            const hasContent = c.chapters.some(ch => ch.vocab.length > 0);
+            return languageMatch && hasContent;
+        });
+
+        return (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-300 relative border border-white/20">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">Choose Practice Source</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Practice from your courses or generate with AI</p>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                setShowCourseSelection(false);
+                                setActiveMode(null);
+                            }}
+                            className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                        {coursesWithContent.length > 0 ? (
+                            coursesWithContent.map(course => (
+                                <button
+                                    key={course.id}
+                                    onClick={() => {
+                                        setSelectedCourse(course);
+                                        setShowCourseSelection(false);
+                                        startPractice(activeMode, course);
+                                    }}
+                                    className="w-full text-left p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all group"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 dark:text-white">{course.title}</h4>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                {course.chapters.reduce((sum, ch) => sum + ch.vocab.length, 0)} words available
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={20} className="text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                                    </div>
+                                </button>
+                            ))
+                        ) : (
+                            <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                                <p className="text-sm">No courses available for {profile?.targetLanguage}</p>
+                                <p className="text-xs mt-1">Upload content or generate with AI</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={() => {
+                            setShowCourseSelection(false);
+                            startPractice(activeMode);
+                        }}
+                        className="w-full p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all flex items-center justify-center gap-2"
+                    >
+                        <Wand2 size={18} className="text-indigo-600 dark:text-indigo-400" />
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Generate with AI</span>
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (activeMode) {
         // --- ACTIVE SESSION VIEW ---
@@ -137,12 +539,14 @@ export default function PracticeHub({ profile }: Props) {
             <div className="flex flex-col min-h-[80vh] pb-24">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => setActiveMode(null)} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors">
+                    <button onClick={handleCloseSession} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
                     <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{activeMode} Practice</span>
+                            <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                {isDailyReview ? 'Daily Review' : activeMode} Practice
+                            </span>
                             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{currentIndex + 1} / {items.length}</span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -346,10 +750,22 @@ export default function PracticeHub({ profile }: Props) {
                 <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 shrink-0">
                     <RefreshCcw size={28} className="group-hover:rotate-180 transition-transform duration-700" />
                 </div>
-                <div>
+                <div className="flex-1">
                     <h3 className="font-bold text-lg text-slate-900 dark:text-white">Daily Review</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">Review 10 words from your library.</p>
-                    <button onClick={() => startPractice('vocab')} className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider hover:underline">Start Now</button>
+                    {stats?.dailyReviewCompleted ? (
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 size={16} className="text-green-500" />
+                            <span className="text-xs font-bold text-green-600 dark:text-green-400">Completed today</span>
+                        </div>
+                    ) : (
+                        <button 
+                            onClick={startDailyReview} 
+                            className="text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider hover:underline"
+                        >
+                            Start Now
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

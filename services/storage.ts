@@ -1,8 +1,8 @@
-import { Course, Note, UserProfile, Chapter, ProcessingJob, ProcessedBatch } from '../types';
+import { Course, Note, UserProfile, Chapter, ProcessingJob, ProcessedBatch, UserStats, PracticeHistory } from '../types';
 import { SEED_COURSES } from './seedData';
 
 const DB_NAME = 'LingoFlowDB';
-const DB_VERSION = 2; // Incremented for new stores
+const DB_VERSION = 4; // Incremented for new stores (practiceHistory)
 
 export class StorageService {
   private db: IDBDatabase | null = null;
@@ -46,6 +46,14 @@ export class StorageService {
              // Composite key manually managed as string "jobId_batchIndex"
             const store = db.createObjectStore('job_batches', { keyPath: 'id' });
             store.createIndex('jobId', 'jobId', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('userStats')) {
+            db.createObjectStore('userStats', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('practiceHistory')) {
+            const store = db.createObjectStore('practiceHistory', { keyPath: 'id' });
+            store.createIndex('date', 'date', { unique: false });
+            store.createIndex('timestamp', 'timestamp', { unique: false });
         }
       };
     });
@@ -170,6 +178,78 @@ export class StorageService {
 
   async getNotes(): Promise<Note[]> {
     return this.getAll('notes') as Promise<Note[]>;
+  }
+
+  // --- USER STATS ---
+  async getStats(): Promise<UserStats> {
+    const today = new Date().toISOString().split('T')[0];
+    const existing = await this.get('userStats', 'current') as UserStats | undefined;
+    
+    if (existing && existing.lastReviewDate === today) {
+      return existing;
+    }
+    
+    // Reset daily stats if new day
+    const stats: UserStats = existing ? {
+      ...existing,
+      todayHighScore: existing.lastReviewDate === today ? existing.todayHighScore : 0,
+      dailyReviewCompleted: existing.lastReviewDate === today ? existing.dailyReviewCompleted : false,
+      lastReviewDate: today
+    } : {
+      id: 'current',
+      todayHighScore: 0,
+      dailyReviewCompleted: false,
+      lastReviewDate: today,
+      totalWordsReviewed: 0,
+      streakDays: 0,
+      lastActivity: Date.now()
+    };
+    
+    await this.saveStats(stats);
+    return stats;
+  }
+
+  async saveStats(stats: UserStats): Promise<void> {
+    return this.put('userStats', stats);
+  }
+
+  // --- PRACTICE HISTORY ---
+  async savePracticeHistory(history: PracticeHistory): Promise<void> {
+    return this.put('practiceHistory', history);
+  }
+
+  async getPracticeHistory(limit?: number): Promise<PracticeHistory[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject('DB not initialized');
+      const tx = this.db.transaction('practiceHistory', 'readonly');
+      const store = tx.objectStore('practiceHistory');
+      const index = store.index('timestamp');
+      const req = index.openCursor(null, 'prev'); // Descending order
+      
+      const results: PracticeHistory[] = [];
+      req.onsuccess = (e: any) => {
+        const cursor = e.target.result;
+        if (cursor && (!limit || results.length < limit)) {
+          results.push(cursor.value);
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getPracticeHistoryByDate(date: string): Promise<PracticeHistory[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) return reject('DB not initialized');
+      const tx = this.db.transaction('practiceHistory', 'readonly');
+      const store = tx.objectStore('practiceHistory');
+      const index = store.index('date');
+      const req = index.getAll(date);
+      req.onsuccess = () => resolve(req.result.sort((a, b) => b.timestamp - a.timestamp));
+      req.onerror = () => reject(req.error);
+    });
   }
 
   // Generic Helpers

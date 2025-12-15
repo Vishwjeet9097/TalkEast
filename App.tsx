@@ -12,6 +12,7 @@ import GlobalStatus from './components/GlobalStatus';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import CourseView from './components/CourseView';
+import ChapterIndex from './components/ChapterIndex';
 import LiveAssistant from './components/LiveAssistant';
 import NotesView from './components/NotesView';
 import PDFUploader from './components/PDFUploader';
@@ -95,8 +96,16 @@ export default function App() {
                   element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><Dashboard profile={profile} /></MainLayout>} 
                 />
                 <Route 
-                   path="/course/:courseId" 
-                   element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><CourseView profile={profile} /></MainLayout>} 
+                  path="/course/:courseId" 
+                  element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><ChapterIndex profile={profile} /></MainLayout>} 
+                />
+                <Route 
+                  path="/course/:courseId/chapter/:chapterId" 
+                  element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><CourseView profile={profile} /></MainLayout>} 
+                />
+                <Route 
+                  path="/course/:courseId/index" 
+                  element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><ChapterIndex profile={profile} /></MainLayout>} 
                 />
                 <Route 
                   path="/practice" 
