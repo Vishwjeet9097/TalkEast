@@ -33,6 +33,20 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   const { speak, cancel, state: audioState, currentText: playingText } = useTTS();
   const dialogueTimeoutRef = useRef<any>(null);
 
+  const getChapterMeta = (chapter: Chapter) => {
+      return {
+          hasDialogue: (chapter.shortDialogue && chapter.shortDialogue.length > 0) || (chapter.longDialogue && chapter.longDialogue.length > 0),
+          vocabCount: chapter.vocab.length,
+          grammarCount: chapter.grammar.length
+      }
+  };
+
+  // Helper function to check if chapter has meaningful data
+  const hasChapterData = (chapter: Chapter): boolean => {
+      const meta = getChapterMeta(chapter);
+      return meta.vocabCount > 0 || meta.hasDialogue || meta.grammarCount > 0;
+  };
+
   useEffect(() => {
     const loadCourse = async () => {
         if (!courseId) return;
@@ -45,16 +59,28 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
             const initialChapterId = state?.activeChapterId || chapterId;
 
             if (initialChapterId) {
-                setActiveChapter(initialChapterId);
-                if (state?.autoStartStudy) {
-                     const ch = found.chapters.find(c => c.id === initialChapterId);
-                     if (ch && ch.vocab.length > 0) {
+                // Only set active chapter if it has data
+                const ch = found.chapters.find(c => c.id === initialChapterId);
+                if (ch && hasChapterData(ch)) {
+                    setActiveChapter(initialChapterId);
+                    if (state?.autoStartStudy && ch.vocab.length > 0) {
                          setIsStudyMode(true);
-                     }
+                    }
+                } else {
+                    // If requested chapter has no data, find first chapter with data
+                    const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
+                    const firstValidChapter = sortedChapters.find(ch => hasChapterData(ch));
+                    if (firstValidChapter) {
+                        setActiveChapter(firstValidChapter.id);
+                    }
                 }
-            } else if(found.chapters.length > 0) {
+            } else {
+                // Find first chapter with data
                 const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
-                setActiveChapter(sortedChapters[0].id);
+                const firstValidChapter = sortedChapters.find(ch => hasChapterData(ch));
+                if (firstValidChapter) {
+                    setActiveChapter(firstValidChapter.id);
+                }
             }
         }
     };
@@ -66,9 +92,12 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
     };
   }, [courseId, location.state, cancel]);
 
+  // Filter chapters to only include those with data, then sort
   const sortedChapters = useMemo(() => {
       if (!course) return [];
-      return [...course.chapters].sort((a, b) => a.order - b.order);
+      const allChapters = [...course.chapters].sort((a, b) => a.order - b.order);
+      // Filter only chapters with data
+      return allChapters.filter(ch => hasChapterData(ch));
   }, [course]);
 
   const currentChapter = useMemo(() => {
@@ -86,21 +115,48 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       return null;
   }, [sortedChapters, activeChapter]);
 
-  const getChapterMeta = (chapter: Chapter) => {
-      return {
-          hasDialogue: (chapter.shortDialogue && chapter.shortDialogue.length > 0) || (chapter.longDialogue && chapter.longDialogue.length > 0),
-          vocabCount: chapter.vocab.length,
-          grammarCount: chapter.grammar.length
-      }
+  // Helper function to determine which tab has data (priority: dialogue > vocab > grammar)
+  const getAvailableTab = (chapter: Chapter | null): 'dialogue' | 'vocab' | 'grammar' | null => {
+      if (!chapter) return null;
+      
+      // Priority 1: Dialogue
+      const hasDialogue = (chapter.shortDialogue && chapter.shortDialogue.length > 0) || 
+                          (chapter.longDialogue && chapter.longDialogue.length > 0);
+      if (hasDialogue) return 'dialogue';
+      
+      // Priority 2: Vocab
+      if (chapter.vocab.length > 0) return 'vocab';
+      
+      // Priority 3: Grammar
+      if (chapter.grammar.length > 0) return 'grammar';
+      
+      return null;
   };
+
+  // Auto-set viewMode when chapter changes to first available tab with data
+  useEffect(() => {
+      if (currentChapter) {
+          const availableTab = getAvailableTab(currentChapter);
+          if (availableTab) {
+              setViewMode(availableTab);
+          }
+      }
+  }, [currentChapter?.id]); // Only run when chapter ID changes
 
   useEffect(() => {
       if (!chapterId || !course) return;
       const exists = course.chapters.find(c => c.id === chapterId);
-      if (exists && exists.id !== activeChapter) {
+      // Only set active chapter if it exists and has data
+      if (exists && hasChapterData(exists) && exists.id !== activeChapter) {
           setActiveChapter(exists.id);
+      } else if (exists && !hasChapterData(exists)) {
+          // If chapter has no data, redirect to first valid chapter
+          const firstValidChapter = sortedChapters[0];
+          if (firstValidChapter) {
+              navigate(`/course/${courseId}/chapter/${firstValidChapter.id}`, { replace: true });
+          }
       }
-  }, [chapterId, course?.id, activeChapter]);
+  }, [chapterId, course?.id, activeChapter, sortedChapters, courseId, navigate]);
 
   // Track last access for recency
   useEffect(() => {
@@ -120,6 +176,14 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   if (!course) return <div className="flex items-center justify-center min-h-[50vh]"><div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div></div>;
 
   if (!chapterId) {
+      return <Navigate to={`/course/${courseId}/index`} replace />;
+  }
+
+  // If current chapter doesn't exist or has no data, redirect to index or first valid chapter
+  if (!currentChapter || !hasChapterData(currentChapter)) {
+      if (sortedChapters.length > 0) {
+          return <Navigate to={`/course/${courseId}/chapter/${sortedChapters[0].id}`} replace />;
+      }
       return <Navigate to={`/course/${courseId}/index`} replace />;
   }
 
@@ -162,7 +226,16 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           const updatedCourse = { ...course, chapters: updatedChapters };
           
           setCourse(updatedCourse);
-          await db.saveCourse(updatedCourse); 
+          await db.saveCourse(updatedCourse);
+          
+          // Auto-switch to the tab that was just generated
+          if (type === 'dialogue') {
+              setViewMode('dialogue');
+          } else if (type === 'vocab') {
+              setViewMode('vocab');
+          } else if (type === 'grammar') {
+              setViewMode('grammar');
+          } 
 
       } catch (e) {
           console.error("Generation failed", e);
@@ -420,28 +493,32 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       {/* Timeline Line */}
                       <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 dark:bg-slate-800"></div>
                       
-                      {sortedChapters.map((ch, idx) => (
-                          <button 
-                            key={ch.id}
-                            onClick={() => {
-                                stopPlayback();
-                                setActiveChapter(ch.id);
-                                setShowTableOfContents(false);
-                            }}
-                            className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
-                                activeChapter === ch.id 
-                                ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
-                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                            }`}
-                          >
-                              <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
-                                  {idx + 1}
-                              </div>
-                              <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                  {ch.title}
-                              </span>
-                          </button>
-                      ))}
+                      {sortedChapters.map((ch, idx) => {
+                          // Only render chapters with data (already filtered in sortedChapters)
+                          return (
+                              <button 
+                                key={ch.id}
+                                onClick={() => {
+                                    stopPlayback();
+                                    setActiveChapter(ch.id);
+                                    setShowTableOfContents(false);
+                                    navigate(`/course/${courseId}/chapter/${ch.id}`, { replace: true });
+                                }}
+                                className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
+                                    activeChapter === ch.id 
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
+                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                  <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                      {idx + 1}
+                                  </div>
+                                  <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                      {ch.title}
+                                  </span>
+                              </button>
+                          );
+                      })}
                   </div>
               </div>
           </div>
@@ -451,7 +528,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-2">
             <button onClick={() => navigate('/dashboard')} className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><ArrowLeft size={20} /></button>
-            <h2 className="text-xl font-bold truncate text-slate-800 dark:text-white max-w-[200px]">{course.title}</h2>
+            <h2 className="text-lg font-bold truncate text-slate-800 dark:text-white max-w-[200px]">{course.title}</h2>
           </div>
           <div className="flex items-center gap-2">
               <button 
@@ -485,22 +562,63 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           <div className="glass-panel rounded-[2.5rem] overflow-hidden min-h-[60vh] flex flex-col shadow-2xl border border-white/60 dark:border-slate-700 relative">
              {/* Content Header & Tabs */}
              <div className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 dark:border-slate-700/50">
-                <div className="p-6 pb-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {currentChapter.order + 1}</p>
-                    <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">{currentChapter.title}</h1>
+                    <div className="p-6 pb-2">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {sortedChapters.findIndex(ch => ch.id === currentChapter.id) + 1}</p>
+                    <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{currentChapter.title}</h1>
                 </div>
 
                 <div className="px-6 pb-4 overflow-x-auto no-scrollbar">
                     <div className="flex p-1.5 bg-slate-100 dark:bg-slate-900/50 rounded-2xl w-max">
-                        <button onClick={() => { stopPlayback(); setViewMode('dialogue'); }} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'dialogue' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}>
-                            <MessageCircle size={16} /> Dialogue
-                        </button>
-                        <button onClick={() => { stopPlayback(); setViewMode('vocab'); }} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'vocab' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}>
-                            <Layers size={16} /> Words
-                        </button>
-                        <button onClick={() => { stopPlayback(); setViewMode('grammar'); }} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'grammar' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}>
-                            <BookOpen size={16} /> Grammar
-                        </button>
+                        {(() => {
+                            const hasDialogue = (currentChapter.shortDialogue && currentChapter.shortDialogue.length > 0) || 
+                                                (currentChapter.longDialogue && currentChapter.longDialogue.length > 0);
+                            const hasVocab = currentChapter.vocab.length > 0;
+                            const hasGrammar = currentChapter.grammar.length > 0;
+                            
+                            return (
+                                <>
+                                    <button 
+                                        onClick={() => { stopPlayback(); setViewMode('dialogue'); }} 
+                                        disabled={!hasDialogue}
+                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                                            viewMode === 'dialogue' 
+                                                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                                                : hasDialogue 
+                                                    ? 'text-slate-500 dark:text-slate-400 hover:text-slate-700' 
+                                                    : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
+                                        }`}
+                                    >
+                                        <MessageCircle size={16} /> Dialogue
+                                    </button>
+                                    <button 
+                                        onClick={() => { stopPlayback(); setViewMode('vocab'); }} 
+                                        disabled={!hasVocab}
+                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                                            viewMode === 'vocab' 
+                                                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                                                : hasVocab 
+                                                    ? 'text-slate-500 dark:text-slate-400 hover:text-slate-700' 
+                                                    : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
+                                        }`}
+                                    >
+                                        <Layers size={16} /> Words
+                                    </button>
+                                    <button 
+                                        onClick={() => { stopPlayback(); setViewMode('grammar'); }} 
+                                        disabled={!hasGrammar}
+                                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                                            viewMode === 'grammar' 
+                                                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                                                : hasGrammar 
+                                                    ? 'text-slate-500 dark:text-slate-400 hover:text-slate-700' 
+                                                    : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-50'
+                                        }`}
+                                    >
+                                        <BookOpen size={16} /> Grammar
+                                    </button>
+                                </>
+                            );
+                        })()}
                     </div>
                  </div>
              </div>
@@ -525,7 +643,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                         <MessageCircle size={36} />
                                      </div>
                                      <div>
-                                        <h4 className="text-xl font-bold text-slate-800 dark:text-white">Conversation Missing</h4>
+                                        <h4 className="text-lg font-bold text-slate-800 dark:text-white">Conversation Missing</h4>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-2">Create a realistic dialogue for this lesson instantly.</p>
                                      </div>
                                      <button 
@@ -558,10 +676,10 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                                 >
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center gap-2">
-                                                             <p className={`text-lg font-bold leading-snug ${isEven ? 'text-slate-800 dark:text-white' : 'text-white'}`}>{line.text}</p>
+                                                             <p className={`text-base font-semibold leading-snug ${isEven ? 'text-slate-800 dark:text-white' : 'text-white'}`}>{line.text}</p>
                                                              {playingText === line.text && audioState === 'PLAYING' && <Volume2 size={16} className={`${isEven ? 'text-indigo-500' : 'text-white/80'} animate-pulse`} />}
                                                         </div>
-                                                        <p className={`text-sm mt-1.5 font-medium ${isEven ? 'text-slate-400' : 'text-white/70'}`}>{line.translation}</p>
+                                                        <p className={`text-sm mt-1.5 font-normal ${isEven ? 'text-slate-400' : 'text-white/70'}`}>{line.translation}</p>
                                                     </div>
                                                 </button>
                                             </div>
@@ -589,7 +707,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                     <Layers size={36} />
                                  </div>
                                  <div>
-                                    <h4 className="text-xl font-bold text-slate-800 dark:text-white">Vocabulary Missing</h4>
+                                    <h4 className="text-lg font-bold text-slate-800 dark:text-white">Vocabulary Missing</h4>
                                     <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-2">Generate a list of essential words for this chapter.</p>
                                  </div>
                                  <button 
@@ -617,13 +735,13 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                                         {playingText === word.original && audioState === 'LOADING' ? <Loader2 size={18} className="animate-spin" /> : <Volume2 size={18} />}
                                                     </div>
                                                     <div>
-                                                        <h4 className="text-lg font-bold text-slate-900 dark:text-white">{word.original}</h4>
+                                                        <h4 className="text-base font-bold text-slate-900 dark:text-white">{word.original}</h4>
                                                         <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{word.reading}</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="pl-14">
-                                                <p className="font-semibold text-slate-700 dark:text-slate-300 leading-snug">{word.meaning}</p>
+                                                <p className="text-base font-medium text-slate-700 dark:text-slate-300 leading-snug">{word.meaning}</p>
                                                 {word.exampleSentence && <p className="text-xs text-slate-400 mt-2 italic bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg">"{word.exampleSentence}"</p>}
                                             </div>
                                         </button>
@@ -651,12 +769,12 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                          
                          {currentChapter.pronunciationTips && currentChapter.pronunciationTips.length > 0 && (
                              <div className="space-y-4">
-                                 <h3 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2"><Mic size={20} /> Pronunciation Clinic</h3>
+                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2"><Mic size={20} /> Pronunciation Clinic</h3>
                                  <div className="grid gap-3">
                                     {currentChapter.pronunciationTips.map((tip, i) => (
                                         <div key={i} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
-                                            <h5 className="font-bold text-indigo-600 dark:text-indigo-400 text-sm mb-1">{tip.title}</h5>
-                                            <p className="text-xs text-slate-500 mb-3 leading-relaxed">{tip.rule}</p>
+                                            <h5 className="font-semibold text-indigo-600 dark:text-indigo-400 text-sm mb-1">{tip.title}</h5>
+                                            <p className="text-sm text-slate-500 mb-3 leading-relaxed">{tip.rule}</p>
                                             <div className="flex flex-wrap gap-2">
                                                 {tip.examples.map((ex, j) => (
                                                     <span key={j} className="text-[10px] bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-slate-600 dark:text-slate-300 font-mono font-bold tracking-wide">{ex}</span>
@@ -675,7 +793,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                         <BookOpen size={36} />
                                      </div>
                                      <div>
-                                        <h4 className="text-xl font-bold text-slate-800 dark:text-white">Grammar Missing</h4>
+                                        <h4 className="text-lg font-bold text-slate-800 dark:text-white">Grammar Missing</h4>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-2">Extract key grammar rules and examples for this section.</p>
                                      </div>
                                      <button 
@@ -691,20 +809,20 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                 currentChapter.grammar.map((point) => (
                                     <div key={point.id} className="relative pl-6 pb-8 border-l-2 border-indigo-100 dark:border-slate-800 last:border-0 last:pb-0">
                                         <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-600 shadow-[0_0_0_4px_white] dark:shadow-[0_0_0_4px_#0f172a]"></div>
-                                        <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{point.title}</h4>
+                                        <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-3">{point.title}</h4>
                                         
                                         <div className="bg-indigo-50/50 dark:bg-slate-800/50 p-4 rounded-xl border border-indigo-100 dark:border-slate-700 mb-4 inline-block">
-                                            <code className="text-sm font-bold text-indigo-600 dark:text-indigo-400 font-mono">{point.structure}</code>
+                                            <code className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 font-mono">{point.structure}</code>
                                         </div>
                                         
-                                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed font-medium">{point.explanation}</p>
+                                        <p className="text-base text-slate-600 dark:text-slate-300 mb-6 leading-relaxed font-normal">{point.explanation}</p>
                                         
                                         <div className="space-y-3">
                                             {point.examples.map((ex, i) => (
                                                 <button key={i} onClick={() => handleSpeak(ex.sentence)} className="w-full text-left bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-1 hover:border-indigo-200 dark:hover:border-slate-600 transition-colors group">
                                                     <div className="flex items-center gap-2">
                                                         <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover:scale-125 transition-transform"></span>
-                                                        <p className="font-bold text-slate-800 dark:text-white">{ex.sentence}</p>
+                                                        <p className="text-base font-semibold text-slate-800 dark:text-white">{ex.sentence}</p>
                                                         <div className="ml-auto text-slate-300 group-hover:text-indigo-500 transition-colors">
                                                             {playingText === ex.sentence && audioState === 'LOADING' ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
                                                         </div>

@@ -233,7 +233,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       <div className="space-y-6">
         <div className="px-1">
             <p className="text-slate-500 dark:text-slate-400 font-semibold text-sm mb-1 uppercase tracking-wide">{getGreeting()},</p>
-            <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">
                 Ready to master <br/>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">{profile?.targetLanguage || 'a new language'}?</span>
             </h2>
@@ -245,16 +245,16 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                 <div className="glass-panel p-4 rounded-2xl border border-white/60 dark:border-slate-700 text-center relative group">
                     <div className="flex items-center justify-center gap-1 mb-1">
                         <Trophy size={16} className="text-yellow-500" />
-                        <span className="text-lg font-extrabold text-slate-900 dark:text-white">{stats.todayHighScore}</span>
+                        <span className="text-base font-bold text-slate-900 dark:text-white">{stats.todayHighScore}</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Today's High Score</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Today's High Score</p>
                 </div>
                 <div className="glass-panel p-4 rounded-2xl border border-white/60 dark:border-slate-700 text-center">
                     <div className="flex items-center justify-center gap-1 mb-1">
                         <Star size={16} className="text-indigo-500" />
-                        <span className="text-lg font-extrabold text-slate-900 dark:text-white">{stats.streakDays}</span>
+                        <span className="text-base font-bold text-slate-900 dark:text-white">{stats.streakDays}</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Day Streak</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Day Streak</p>
                 </div>
                 <button 
                     onClick={async () => {
@@ -266,9 +266,9 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                 >
                     <div className="flex items-center justify-center gap-1 mb-1">
                         <History size={16} className="text-purple-500 group-hover:text-indigo-600 transition-colors" />
-                        <span className="text-lg font-extrabold text-slate-900 dark:text-white">{stats.totalWordsReviewed}</span>
+                        <span className="text-base font-bold text-slate-900 dark:text-white">{stats.totalWordsReviewed}</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Words Reviewed</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Words Reviewed</p>
                 </button>
             </div>
         )}
@@ -281,7 +281,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                 <input 
                     type="text" 
                     placeholder={`Ask AI or search in ${profile?.nativeLanguage}...`}
-                    className="w-full py-3 bg-transparent outline-none text-slate-800 dark:text-white font-medium placeholder-slate-400"
+                    className="w-full py-3 bg-transparent outline-none text-base text-slate-800 dark:text-white font-normal placeholder-slate-400"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAISearch()}
@@ -390,7 +390,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       {/* QUICK PRACTICE */}
       <div>
         <div className="flex justify-between items-center mb-5 px-1">
-            <h3 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Zap size={20} className="text-amber-500 fill-amber-500" /> Jump Back In
             </h3>
         </div>
@@ -416,7 +416,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                                     {course.title.substring(0, 15)}...
                                 </span>
                             </div>
-                            <h4 className="text-2xl font-bold text-slate-800 dark:text-white leading-tight line-clamp-2">
+                            <h4 className="text-lg font-bold text-slate-800 dark:text-white leading-tight line-clamp-2">
                                 {chapter.title}
                             </h4>
                         </div>
@@ -442,7 +442,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       {/* Course List */}
       <div>
         <div className="flex justify-between items-center mb-5 px-1">
-            <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Your Library</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Your Library</h3>
             <button 
                 onClick={() => navigate('/upload')} 
                 className="btn-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"
@@ -461,7 +461,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
             <div className="w-20 h-20 bg-indigo-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-inner">
                 <Book className="h-8 w-8 text-indigo-400" />
             </div>
-            <h4 className="font-bold text-xl mb-2 text-slate-800 dark:text-white">Library Empty</h4>
+            <h4 className="font-bold text-lg mb-2 text-slate-800 dark:text-white">Library Empty</h4>
             <p className="text-slate-500 text-sm mb-8 max-w-[220px] leading-relaxed">Import a textbook PDF or photo to generate your personalized AI course.</p>
             <button 
                 onClick={() => navigate('/upload')}
@@ -485,7 +485,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                 
                 <div className="flex-1 min-w-0 relative z-10">
                     <div className="flex items-center gap-2 mb-1.5">
-                        <h4 className="font-extrabold text-lg truncate text-slate-900 dark:text-white tracking-tight">{course.title}</h4>
+                        <h4 className="font-bold text-base truncate text-slate-900 dark:text-white tracking-tight">{course.title}</h4>
                         {course.processingJobId && (
                             <span className="flex items-center gap-1 bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
                                 <Loader2 size={10} className="animate-spin" /> BUILDING
