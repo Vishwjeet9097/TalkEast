@@ -18,7 +18,8 @@ export default function Onboarding({ onComplete }: Props) {
       nativeLanguage: native,
       targetLanguage: target,
       onboardingComplete: true,
-      theme: 'light' // Default
+      theme: 'light', // Default
+      useEnvKey: true
     });
     navigate('/dashboard', { replace: true });
   };

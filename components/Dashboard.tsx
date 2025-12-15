@@ -89,7 +89,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       setIsSearchingAI(true);
       setFilteredResults([]); 
       try {
-          const result = await searchWordMeaning(searchQuery, profile.nativeLanguage, profile.targetLanguage);
+          const result = await searchWordMeaning(searchQuery, profile.nativeLanguage, profile.targetLanguage, profile);
           setAiResult(result);
       } catch (e) {
           console.error(e);

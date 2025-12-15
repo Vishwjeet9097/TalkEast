@@ -1,13 +1,21 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { SearchResult, Chapter, DialogueLine, VocabWord, GrammarPoint, PracticeItem, PracticeType } from "../types";
+import { SearchResult, Chapter, DialogueLine, VocabWord, GrammarPoint, PracticeItem, PracticeType, UserProfile } from "../types";
 import { PDFPageContent } from "./pdfProcessor";
 
-const API_KEY = process.env.API_KEY || '';
+const ENV_API_KEY = process.env.API_KEY || '';
 
-const getAI = () => {
-    if(!API_KEY) throw new Error("API Key missing");
-    return new GoogleGenAI({ apiKey: API_KEY });
+export const getApiKeyForProfile = (profile?: UserProfile): string => {
+    if (!profile || profile.useEnvKey !== false) {
+        return ENV_API_KEY;
+    }
+    return (profile.apiKey || '').trim();
+};
+
+const getAI = (profile?: UserProfile) => {
+    const apiKey = getApiKeyForProfile(profile);
+    if(!apiKey) throw new Error("API Key missing. Add it in Profile or .env.local.");
+    return new GoogleGenAI({ apiKey });
 }
 
 // Retry logic wrapper
@@ -45,9 +53,10 @@ const generateWithRetry = async (model: any, params: any, retries = 3): Promise<
 
 export const analyzeContentBatch = async (
     pages: PDFPageContent[], 
-    targetLang: string
+    targetLang: string,
+    profile?: UserProfile
 ): Promise<Chapter[]> => {
-    const ai = getAI();
+    const ai = getAI(profile);
     
     // Construct Prompt Parts
     const contentParts = [];
@@ -200,9 +209,10 @@ export const generateMissingSection = async (
     chapter: Chapter,
     sectionType: 'dialogue' | 'grammar' | 'vocab',
     targetLang: string,
-    nativeLang: string = 'English'
+    nativeLang: string = 'English',
+    profile?: UserProfile
 ): Promise<any> => {
-    const ai = getAI();
+    const ai = getAI(profile);
     let prompt = "";
     let schema: any = {};
 
@@ -292,9 +302,9 @@ export const generateMissingSection = async (
     return JSON.parse(response.text || "{}");
 }
 
-export const searchWordMeaning = async (word: string, nativeLang: string, targetLang: string): Promise<SearchResult> => {
+export const searchWordMeaning = async (word: string, nativeLang: string, targetLang: string, profile?: UserProfile): Promise<SearchResult> => {
      try {
-    const ai = getAI();
+    const ai = getAI(profile);
     const isEnglishNative = nativeLang.toLowerCase() === 'english';
     
     // Construct Prompt
@@ -361,9 +371,9 @@ export const searchWordMeaning = async (word: string, nativeLang: string, target
   }
 };
 
-export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
+export const transcribeAudio = async (audioBlob: Blob, profile?: UserProfile): Promise<string> => {
     try {
-        const ai = getAI();
+        const ai = getAI(profile);
         const reader = new FileReader();
         return new Promise((resolve, reject) => {
             reader.onloadend = async () => {
@@ -403,9 +413,10 @@ export const generatePracticeSession = async (
     type: PracticeType,
     targetLang: string,
     nativeLang: string,
-    context?: string // e.g., "Food", "Travel", or list of words
+    context?: string, // e.g., "Food", "Travel", or list of words
+    profile?: UserProfile
 ): Promise<PracticeItem[]> => {
-    const ai = getAI();
+    const ai = getAI(profile);
     let prompt = "";
     
     // Construct Prompt based on type
@@ -465,9 +476,10 @@ export const explainGrammarMistake = async (
     userAnswer: string,
     correctAnswer: string,
     targetLang: string,
-    nativeLang: string
+    nativeLang: string,
+    profile?: UserProfile
 ): Promise<string> => {
-    const ai = getAI();
+    const ai = getAI(profile);
     const prompt = `
         Context: Language Learning (${targetLang}).
         Task: Translate "${question}" to ${targetLang}.

@@ -57,7 +57,8 @@ export default function PracticeHub({ profile }: Props) {
                 type, 
                 profile.targetLanguage, 
                 profile.nativeLanguage, 
-                context
+                context,
+                profile
             );
             setItems(generatedItems);
         } catch (e) {
@@ -102,7 +103,8 @@ export default function PracticeHub({ profile }: Props) {
                 userInput,
                 currentItem.correctAnswer,
                 profile.targetLanguage,
-                profile.nativeLanguage
+                profile.nativeLanguage,
+                profile
             );
             setAiExplanation(explanation);
         } catch (e) {

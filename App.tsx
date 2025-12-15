@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'r
 import { db } from './services/storage';
 import { NotificationService } from './services/notifications';
 import { UserProfile, Language } from './types';
-import { BookOpen, Mic, PenTool, Layout, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit, Sun, Moon } from 'lucide-react';
+import { BookOpen, Mic, PenTool, Layout, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit, Sun, Moon, UserRound } from 'lucide-react';
 import { ProcessingProvider } from './context/ProcessingContext';
 import GlobalStatus from './components/GlobalStatus';
 
@@ -16,29 +16,41 @@ import LiveAssistant from './components/LiveAssistant';
 import NotesView from './components/NotesView';
 import PDFUploader from './components/PDFUploader';
 import PracticeHub from './components/PracticeHub';
+import Profile from './components/Profile';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
+  const normalizeProfile = (p: UserProfile | null): UserProfile | null => {
+    if (!p) return null;
+    return { ...p, useEnvKey: p.useEnvKey ?? true };
+  };
+
   useEffect(() => {
     const initApp = async () => {
       await db.init();
       const user = await db.getProfile();
-      setProfile(user);
+      const normalized = normalizeProfile(user);
+      if (normalized && normalized.useEnvKey === undefined) {
+        normalized.useEnvKey = true;
+      }
+      setProfile(normalized);
       setLoading(false);
       NotificationService.requestPermission();
       
-      const isDark = user?.theme === 'dark';
+      const isDark = normalized?.theme === 'dark';
       document.documentElement.classList.toggle('dark', isDark);
     };
     initApp();
   }, []);
 
   const handleProfileUpdate = async (newProfile: UserProfile) => {
-    await db.saveProfile(newProfile);
-    setProfile(newProfile);
-    document.documentElement.classList.toggle('dark', newProfile.theme === 'dark');
+    const normalized = normalizeProfile({ ...newProfile, useEnvKey: newProfile.useEnvKey ?? true });
+    if (!normalized) return;
+    await db.saveProfile(normalized);
+    setProfile(normalized);
+    document.documentElement.classList.toggle('dark', normalized.theme === 'dark');
   };
 
   if (loading) {
@@ -96,11 +108,15 @@ export default function App() {
                 />
                 <Route 
                   path="/notes" 
-                  element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><NotesView /></MainLayout>} 
+                  element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><NotesView profile={profile} /></MainLayout>} 
                 />
                 <Route 
                   path="/upload" 
                   element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><PDFUploader profile={profile} /></MainLayout>} 
+                />
+                <Route
+                  path="/profile"
+                  element={<MainLayout profile={profile} onUpdateProfile={handleProfileUpdate}><Profile profile={profile} onUpdateProfile={handleProfileUpdate} /></MainLayout>}
                 />
               </Routes>
           </div>
@@ -185,6 +201,7 @@ const MainLayout = ({
   onUpdateProfile?: (p: UserProfile) => void 
 }) => {
     const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+    const navigate = useNavigate();
     const isDarkTheme = profile?.theme === 'dark';
     const ThemeIcon = isDarkTheme ? Moon : Sun;
 
@@ -217,6 +234,12 @@ const MainLayout = ({
                  </div>
                  
                  <div className="flex items-center gap-3">
+                     <button
+                        onClick={() => navigate('/profile')}
+                        className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                     >
+                        <UserRound size={18} />
+                     </button>
                      <button
                         onClick={toggleTheme}
                         className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-amber-300 transition-colors"

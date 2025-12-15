@@ -77,7 +77,8 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
               currentChapter, 
               type, 
               course.targetLanguage || 'English',
-              profile.nativeLanguage || 'English'
+              profile.nativeLanguage || 'English',
+              profile
           );
           
           const updatedChapter = { ...currentChapter };

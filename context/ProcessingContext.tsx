@@ -37,6 +37,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [activeTaskName, setActiveTaskName] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [shouldStop, setShouldStop] = useState(false);
+  const profileRef = useRef<UserProfile | null>(null);
 
   // Helper to wait
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -71,7 +72,7 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
             try {
                 // 5. Analyze
-                const rawChapters = await analyzeContentBatch(batch.pages, job.courseMetadata.targetLanguage);
+                const rawChapters = await analyzeContentBatch(batch.pages, job.courseMetadata.targetLanguage, profileRef.current || undefined);
                 
                 // 6. Fix Chapter Metadata (Order, CourseID)
                 // We need to determine the correct order offset based on existing chapters
@@ -187,6 +188,8 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const jobId = PDFProcessor.generateJobId(file);
     const courseId = crypto.randomUUID(); // Create ID immediately
 
+    profileRef.current = profile;
+
     // Create Initial "Empty" Course so it appears in Library immediately
     const initialCourse: Course = {
         id: courseId,
@@ -245,6 +248,12 @@ export const ProcessingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const resumeJob = useCallback(async (jobId: string) => {
       const job = await db.getJob(jobId);
       if (!job) return;
+
+      // Attempt to reuse last known profile; if not available, fall back to env
+      if (!profileRef.current) {
+          const profile = await db.getProfile();
+          profileRef.current = profile;
+      }
 
       setActiveJobId(job.id);
       setActiveTaskName(job.courseMetadata.title);

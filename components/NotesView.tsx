@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../services/storage';
 import { transcribeAudio } from '../services/gemini';
-import { Note } from '../types';
+import { Note, UserProfile } from '../types';
 import { Plus, Trash2, Edit3, Bold, Italic, Mic, Loader2, StopCircle, List, Tag, X, Filter, ChevronLeft, AlertTriangle } from 'lucide-react';
 
-export default function NotesView() {
+export default function NotesView({ profile }: { profile: UserProfile | null }) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNote, setActiveNote] = useState<Note | null>(null);
   const [initialNote, setInitialNote] = useState<Note | null>(null); // Track original state
@@ -153,7 +153,7 @@ export default function NotesView() {
     if (!activeNote) return;
     setIsTranscribing(true);
     try {
-      const text = await transcribeAudio(audioBlob);
+      const text = await transcribeAudio(audioBlob, profile || undefined);
       // Append text to note as a paragraph
       const currentHtml = contentRef.current?.innerHTML || '';
       const newHtml = currentHtml + `<p>${text}</p>`;

@@ -12,6 +12,8 @@ export interface UserProfile {
   targetLanguage: Language;
   onboardingComplete: boolean;
   theme: 'light' | 'dark';
+  apiKey?: string;
+  useEnvKey?: boolean;
 }
 
 export interface DialogueLine {

@@ -2,10 +2,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { UserProfile } from '../types';
+import { getApiKeyForProfile } from '../services/gemini';
 import { Mic, MicOff, Save, StopCircle, User, Activity } from 'lucide-react';
 import { db } from '../services/storage';
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Audio Utilities (from Google Guidelines)
 function encode(bytes: Uint8Array) {
@@ -75,6 +74,13 @@ export default function LiveAssistant({ profile }: { profile: UserProfile | null
 
   const startSession = async () => {
     if (!profile) return;
+    const apiKey = getApiKeyForProfile(profile);
+    if (!apiKey) {
+        setStatus('Missing API key');
+        alert("API key नहीं मिला। प्रोफ़ाइल में जोड़ें या env.local सेट करें।");
+        return;
+    }
+    const ai = new GoogleGenAI({ apiKey });
     setIsActive(true);
     setStatus('Connecting...');
     setTranscription('');
