@@ -192,24 +192,96 @@ export class StorageService {
   }
 
   async getCourses(): Promise<Course[]> {
-    const courses = await this.getAll('courses') as any[];
-    for (const course of courses) {
-        course.chapters = await this.getChaptersForCourse(course.id);
+    // Ensure DB is initialized
+    if (!this.db) {
+      await this.init();
     }
+    
+    const courses = await this.getAll('courses') as any[];
+    console.log('getCourses: Found', courses.length, 'courses in DB');
+    
+    // Load chapters for each course
+    for (const course of courses) {
+        try {
+            course.chapters = await this.getChaptersForCourse(course.id);
+            console.log(`Course "${course.title}": ${course.chapters.length} chapters`);
+        } catch (error) {
+            console.error(`Error loading chapters for course ${course.id}:`, error);
+            course.chapters = [];
+        }
+    }
+    
     return courses;
   }
   
   async getChaptersForCourse(courseId: string): Promise<Chapter[]> {
       return new Promise((resolve, reject) => {
-          if (!this.db) return reject('DB not init');
-          const tx = this.db.transaction(['chapters'], 'readonly');
-          const store = tx.objectStore('chapters');
-          const index = store.index('courseId');
-          const request = index.getAll(courseId);
+          if (!this.db) {
+              reject('DB not init');
+              return;
+          }
           
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          try {
+              const tx = this.db.transaction(['chapters'], 'readonly');
+              const store = tx.objectStore('chapters');
+              
+              // Check if index exists
+              if (!store.indexNames.contains('courseId')) {
+                  console.warn('courseId index not found, returning empty array');
+                  resolve([]);
+                  return;
+              }
+              
+              const index = store.index('courseId');
+              const request = index.getAll(courseId);
+              
+              request.onsuccess = () => {
+                  const chapters = request.result || [];
+                  console.log(`getChaptersForCourse(${courseId}): Found ${chapters.length} chapters`);
+                  resolve(chapters);
+              };
+              
+              request.onerror = () => {
+                  console.error('Error getting chapters:', request.error);
+                  reject(request.error);
+              };
+          } catch (error) {
+              console.error('Exception in getChaptersForCourse:', error);
+              reject(error);
+          }
       })
+  }
+
+  async deleteCourse(courseId: string): Promise<void> {
+      return new Promise((resolve, reject) => {
+          if (!this.db) return reject('DB not initialized');
+          
+          // Start transaction for both courses and chapters
+          const tx = this.db.transaction(['courses', 'chapters'], 'readwrite');
+          const courseStore = tx.objectStore('courses');
+          const chapterStore = tx.objectStore('chapters');
+          
+          // Delete the course
+          const deleteCourseReq = courseStore.delete(courseId);
+          
+          // Delete all chapters for this course
+          const index = chapterStore.index('courseId');
+          const getChaptersReq = index.getAll(courseId);
+          
+          getChaptersReq.onsuccess = () => {
+              const chapters = getChaptersReq.result;
+              chapters.forEach((chapter: Chapter) => {
+                  chapterStore.delete(chapter.id);
+              });
+          };
+          
+          deleteCourseReq.onsuccess = () => {
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+          };
+          
+          deleteCourseReq.onerror = () => reject(deleteCourseReq.error);
+      });
   }
 
   async saveNote(note: Note): Promise<void> {

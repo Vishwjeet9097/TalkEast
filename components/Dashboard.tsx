@@ -15,6 +15,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
   const [isLoading, setIsLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [practiceHistory, setPracticeHistory] = useState<PracticeHistory[]>([]);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredResults, setFilteredResults] = useState<{ type: 'course'|'chapter'|'word', title: string, subtitle?: string, id: string, courseId?: string, chapterId?: string }[]>([]);
@@ -38,23 +39,40 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
 
   const loadData = useCallback(async () => {
       try {
+          // Ensure DB is initialized
+          await db.init();
+          
           const data = await db.getCourses();
+          console.log('Loaded courses from DB:', data.length, data);
+          
+          // Filter courses by target language if profile exists
           const filteredCourses = data.filter(c => {
-              if (c.targetLanguage) {
-                  return c.targetLanguage === profile?.targetLanguage;
+              // If course has targetLanguage, match with profile
+              if (c.targetLanguage && profile?.targetLanguage) {
+                  return c.targetLanguage === profile.targetLanguage;
               }
-              return true;
+              // If course has no targetLanguage, show it (legacy data)
+              if (!c.targetLanguage) {
+                  return true;
+              }
+              // If profile has no targetLanguage, show all
+              if (!profile?.targetLanguage) {
+                  return true;
+              }
+              return false;
           });
+          
+          console.log('Filtered courses:', filteredCourses.length, filteredCourses);
+          
           filteredCourses.sort((a, b) => {
               if (a.processingJobId && !b.processingJobId) return -1;
               if (!a.processingJobId && b.processingJobId) return 1;
               return 0; 
           });
           
-          // Only update if courses actually changed
-          if (hasDataChanged(filteredCourses, prevDataRef.current.courses, 'courses')) {
-              setCourses(filteredCourses);
-          }
+          // Always update courses - remove the hasDataChanged check for now
+          setCourses(filteredCourses);
+          prevDataRef.current.courses = JSON.stringify(filteredCourses);
           
           const chaptersList: {course: Course, chapter: Chapter}[] = [];
           filteredCourses.forEach(c => {
@@ -86,25 +104,22 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
               }
           }
           
-          // Only update if chapters actually changed
-          if (hasDataChanged(picked, prevDataRef.current.chapters, 'chapters')) {
-              setRecentChapters(picked);
-          }
+          // Always update chapters
+          setRecentChapters(picked);
+          prevDataRef.current.chapters = JSON.stringify(picked);
 
           const allJobs = await db.getAllJobs();
           const activeJobs = allJobs.filter(j => j.status !== 'completed').sort((a,b) => b.updatedAt - a.updatedAt);
           
-          // Only update if jobs actually changed
-          if (hasDataChanged(activeJobs, prevDataRef.current.jobs, 'jobs')) {
-              setJobs(activeJobs);
-          }
+          // Always update jobs
+          setJobs(activeJobs);
+          prevDataRef.current.jobs = JSON.stringify(activeJobs);
 
           const userStats = await db.getStats();
           
-          // Only update if stats actually changed
-          if (hasDataChanged(userStats, prevDataRef.current.stats, 'stats')) {
-              setStats(userStats);
-          }
+          // Always update stats
+          setStats(userStats);
+          prevDataRef.current.stats = JSON.stringify(userStats);
       } catch (error) {
           console.error('Error loading data:', error);
       }
@@ -181,6 +196,33 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       if (result.type === 'course') navigate(`/course/${result.id}`);
       else if (result.type === 'chapter') navigate(`/course/${result.courseId}`, { state: { activeChapterId: result.id } });
       else if (result.type === 'word') navigate(`/course/${result.courseId}`, { state: { activeChapterId: result.chapterId } });
+  };
+
+  const handleDeleteCourse = async (course: Course, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent navigation
+    setCourseToDelete(course);
+  };
+
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
+    
+    try {
+      // Delete associated job if exists
+      if (courseToDelete.processingJobId) {
+        await deleteJob(courseToDelete.processingJobId);
+      }
+      
+      // Delete the course and its chapters
+      await db.deleteCourse(courseToDelete.id);
+      
+      // Reload data
+      await loadData();
+      
+      setCourseToDelete(null);
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      alert('Failed to delete course. Please try again.');
+    }
   };
 
   return (
@@ -504,8 +546,20 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                     </div>
                 </div>
 
-                <div className="h-12 w-12 rounded-full border border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-300 group-hover:text-indigo-500 group-hover:border-indigo-100 transition-all relative z-10 bg-white/50 dark:bg-slate-800/50">
+                <div className="flex items-center gap-2 relative z-10">
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => handleDeleteCourse(course, e)}
+                    className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all opacity-0 group-hover:opacity-100"
+                    title="Delete course"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  
+                  {/* Navigate Button */}
+                  <div className="h-12 w-12 rounded-full border border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-300 group-hover:text-indigo-500 group-hover:border-indigo-100 transition-all bg-white/50 dark:bg-slate-800/50">
                     <ChevronRight size={20} className="ml-0.5" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -587,6 +641,46 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                   </div>
               </div>
           </div>
+      )}
+
+      {/* Delete Course Confirmation Modal */}
+      {courseToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setCourseToDelete(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-300 relative border border-white/20" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <AlertTriangle size={24} className="text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900 dark:text-white">Delete Course?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 mb-6">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Course:</p>
+              <p className="text-base font-bold text-slate-900 dark:text-white">{courseToDelete.title}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                {courseToDelete.chapters?.length || 0} chapters and all associated content will be permanently deleted.
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCourseToDelete(null)}
+                className="flex-1 px-6 py-3 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteCourse}
+                className="flex-1 px-6 py-3 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg shadow-red-500/30"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

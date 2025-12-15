@@ -28,9 +28,17 @@ export default function ChapterIndex({ profile }: ChapterIndexProps) {
     useEffect(() => {
         const load = async () => {
             if (!courseId) return;
-            const courses = await db.getCourses();
-            const found = courses.find(c => c.id === courseId) || null;
-            setCourse(found);
+            try {
+                // Ensure DB is initialized
+                await db.init();
+                const courses = await db.getCourses();
+                console.log('ChapterIndex: Loaded courses:', courses.length);
+                const found = courses.find(c => c.id === courseId) || null;
+                console.log('ChapterIndex: Found course:', found?.title, 'with', found?.chapters?.length, 'chapters');
+                setCourse(found);
+            } catch (error) {
+                console.error('Error loading course in ChapterIndex:', error);
+            }
         };
         load();
     }, [courseId]);

@@ -51,38 +51,46 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   useEffect(() => {
     const loadCourse = async () => {
         if (!courseId) return;
-        const courses = await db.getCourses();
-        const found = courses.find(c => c.id === courseId);
-        if (found) {
-            setCourse(found);
-            
-            const state = (location.state || {}) as { activeChapterId?: string, autoStartStudy?: boolean } | null;
-            const initialChapterId = state?.activeChapterId || chapterId;
+        try {
+            // Ensure DB is initialized
+            await db.init();
+            const courses = await db.getCourses();
+            console.log('CourseView: Loaded courses:', courses.length);
+            const found = courses.find(c => c.id === courseId);
+            console.log('CourseView: Found course:', found?.title, 'with', found?.chapters?.length, 'chapters');
+            if (found) {
+                setCourse(found);
+                
+                const state = (location.state || {}) as { activeChapterId?: string, autoStartStudy?: boolean } | null;
+                const initialChapterId = state?.activeChapterId || chapterId;
 
-            if (initialChapterId) {
-                // Only set active chapter if it has data
-                const ch = found.chapters.find(c => c.id === initialChapterId);
-                if (ch && hasChapterData(ch)) {
-                    setActiveChapter(initialChapterId);
-                    if (state?.autoStartStudy && ch.vocab.length > 0) {
-                         setIsStudyMode(true);
+                if (initialChapterId) {
+                    // Only set active chapter if it has data
+                    const ch = found.chapters.find(c => c.id === initialChapterId);
+                    if (ch && hasChapterData(ch)) {
+                        setActiveChapter(initialChapterId);
+                        if (state?.autoStartStudy && ch.vocab.length > 0) {
+                             setIsStudyMode(true);
+                        }
+                    } else {
+                        // If requested chapter has no data, find first chapter with data
+                        const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
+                        const firstValidChapter = sortedChapters.find(ch => hasChapterData(ch));
+                        if (firstValidChapter) {
+                            setActiveChapter(firstValidChapter.id);
+                        }
                     }
                 } else {
-                    // If requested chapter has no data, find first chapter with data
+                    // Find first chapter with data
                     const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
                     const firstValidChapter = sortedChapters.find(ch => hasChapterData(ch));
                     if (firstValidChapter) {
                         setActiveChapter(firstValidChapter.id);
                     }
                 }
-            } else {
-                // Find first chapter with data
-                const sortedChapters = [...found.chapters].sort((a, b) => a.order - b.order);
-                const firstValidChapter = sortedChapters.find(ch => hasChapterData(ch));
-                if (firstValidChapter) {
-                    setActiveChapter(firstValidChapter.id);
-                }
             }
+        } catch (error) {
+            console.error('Error loading course in CourseView:', error);
         }
     };
     loadCourse();
