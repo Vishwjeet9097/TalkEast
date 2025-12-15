@@ -76,6 +76,51 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       return sortedChapters.find(c => c.id === activeChapter);
   }, [sortedChapters, activeChapter]);
 
+  // Auto-navigate to appropriate tab based on chapter content
+  useEffect(() => {
+    if (!currentChapter) return;
+    
+    const hasDialogue = (currentChapter.shortDialogue && currentChapter.shortDialogue.length > 0) || 
+                        (currentChapter.longDialogue && currentChapter.longDialogue.length > 0);
+    const hasVocab = currentChapter.vocab.length > 0;
+    const hasGrammar = currentChapter.grammar.length > 0;
+    
+    // Count how many tabs have content
+    const tabsWithContent = [hasDialogue, hasVocab, hasGrammar].filter(Boolean).length;
+    
+    // If no content, redirect to chapter index
+    if (tabsWithContent === 0) {
+        if (courseId) {
+            navigate(`/course/${courseId}/index`);
+        }
+        return;
+    }
+    
+    // Priority order: dialogue > vocab > grammar
+    // If 2 tabs have content, navigate to first available in priority order
+    if (tabsWithContent === 2) {
+        if (hasDialogue) {
+            setViewMode('dialogue');
+        } else if (hasVocab) {
+            setViewMode('vocab');
+        } else if (hasGrammar) {
+            setViewMode('grammar');
+        }
+    }
+    // If only one tab has content, auto-navigate to it
+    else if (tabsWithContent === 1) {
+        if (hasDialogue) {
+            setViewMode('dialogue');
+        } else if (hasVocab) {
+            setViewMode('vocab');
+        } else if (hasGrammar) {
+            setViewMode('grammar');
+        }
+    }
+    // If all 3 tabs have content, keep default (dialogue) - normal approach
+    // This ensures normal flow is maintained
+  }, [currentChapter, courseId, navigate]);
+
   const currentVocabList = currentChapter?.vocab || [];
 
   const nextChapterId = useMemo(() => {
@@ -94,6 +139,20 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
           grammarCount: chapter.grammar.length
       }
   };
+
+  const hasChapterContent = (chapter: Chapter): boolean => {
+      const hasDialogue = (chapter.shortDialogue && chapter.shortDialogue.length > 0) || 
+                          (chapter.longDialogue && chapter.longDialogue.length > 0);
+      const hasVocab = chapter.vocab.length > 0;
+      const hasGrammar = chapter.grammar.length > 0;
+      return hasDialogue || hasVocab || hasGrammar;
+  };
+
+  // Filter chapters with content for TOC
+  const chaptersWithContent = useMemo(() => {
+      if (!course) return [];
+      return sortedChapters.filter(ch => hasChapterContent(ch));
+  }, [sortedChapters, course]);
 
   useEffect(() => {
       if (!chapterId || !course) return;
@@ -413,6 +472,24 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       );
   }
 
+  // Check if current chapter has any content
+  const currentChapterHasContent = currentChapter && hasChapterContent(currentChapter);
+
+  // If chapter has no content, redirect to index
+  if (currentChapter && !currentChapterHasContent) {
+    if (courseId) {
+      return <Navigate to={`/course/${courseId}/index`} replace />;
+    }
+  }
+
+  if (!course || !currentChapter) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-24 relative">
       
@@ -428,28 +505,39 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                       {/* Timeline Line */}
                       <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-slate-100 dark:bg-slate-800"></div>
                       
-                      {sortedChapters.map((ch, idx) => (
-                          <button 
-                            key={ch.id}
-                            onClick={() => {
-                                stopPlayback();
-                                setActiveChapter(ch.id);
-                                setShowTableOfContents(false);
-                            }}
-                            className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
-                                activeChapter === ch.id 
-                                ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
-                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                            }`}
-                          >
-                              <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
-                                  {idx + 1}
-                              </div>
-                              <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                  {ch.title}
-                              </span>
-                          </button>
-                      ))}
+                      {chaptersWithContent.length > 0 ? (
+                          chaptersWithContent.map((ch) => {
+                              // Get original position in all chapters (including blank ones) for proper numbering
+                              const originalIndex = sortedChapters.findIndex(c => c.id === ch.id);
+                              
+                              return (
+                                  <button 
+                                      key={ch.id}
+                                      onClick={() => {
+                                          stopPlayback();
+                                          setActiveChapter(ch.id);
+                                          setShowTableOfContents(false);
+                                      }}
+                                      className={`relative w-full text-left p-4 pl-12 rounded-2xl transition-all ${
+                                          activeChapter === ch.id 
+                                          ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800' 
+                                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                      }`}
+                                  >
+                                      <div className={`absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-4 border-white dark:border-slate-900 z-10 ${activeChapter === ch.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+                                          {originalIndex >= 0 ? originalIndex + 1 : ch.order + 1}
+                                      </div>
+                                      <span className={`text-sm font-bold ${activeChapter === ch.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                          {ch.title}
+                                      </span>
+                                  </button>
+                              );
+                          })
+                      ) : (
+                          <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                              <p className="text-sm">No chapters with content available</p>
+                          </div>
+                      )}
                   </div>
               </div>
           </div>
@@ -494,7 +582,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
              {/* Content Header & Tabs */}
              <div className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 dark:border-slate-700/50">
                 <div className="p-6 pb-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {currentChapter.order + 1}</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {sortedChapters.findIndex(c => c.id === currentChapter.id) + 1}</p>
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white leading-tight">{currentChapter.title}</h1>
                 </div>
 

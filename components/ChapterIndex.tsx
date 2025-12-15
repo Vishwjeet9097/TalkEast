@@ -14,6 +14,14 @@ const getChapterMeta = (chapter: Chapter) => ({
     grammarCount: chapter.grammar.length,
 });
 
+const hasChapterContent = (chapter: Chapter): boolean => {
+    const hasDialogue = (chapter.shortDialogue && chapter.shortDialogue.length > 0) || 
+                        (chapter.longDialogue && chapter.longDialogue.length > 0);
+    const hasVocab = chapter.vocab.length > 0;
+    const hasGrammar = chapter.grammar.length > 0;
+    return hasDialogue || hasVocab || hasGrammar;
+};
+
 export default function ChapterIndex({ profile }: ChapterIndexProps) {
     const { courseId } = useParams();
     const navigate = useNavigate();
@@ -31,7 +39,9 @@ export default function ChapterIndex({ profile }: ChapterIndexProps) {
 
     const sortedChapters = useMemo(() => {
         if (!course) return [];
-        return [...course.chapters].sort((a, b) => a.order - b.order);
+        return [...course.chapters]
+            .filter(ch => hasChapterContent(ch)) // Filter out blank chapters
+            .sort((a, b) => a.order - b.order);
     }, [course]);
 
     if (!course) {
@@ -82,6 +92,10 @@ export default function ChapterIndex({ profile }: ChapterIndexProps) {
                 <div className="grid gap-4 sm:grid-cols-2">
                     {sortedChapters.map((ch, idx) => {
                         const meta = getChapterMeta(ch);
+                        // Get original position in all chapters (including blank ones) for proper numbering
+                        const allChapters = [...course.chapters].sort((a, b) => a.order - b.order);
+                        const originalIndex = allChapters.findIndex(c => c.id === ch.id);
+                        
                         return (
                             <button
                                 key={ch.id}
@@ -92,10 +106,10 @@ export default function ChapterIndex({ profile }: ChapterIndexProps) {
                                 <div className="p-4 pl-5 flex flex-col gap-2">
                                     <div className="flex items-center gap-3">
                                         <span className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold bg-indigo-600 text-white shadow-sm">
-                                            {idx + 1}
+                                            {originalIndex >= 0 ? originalIndex + 1 : idx + 1}
                                         </span>
                                         <div className="min-w-0">
-                                            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Chapter {ch.order + 1}</p>
+                                            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Chapter {originalIndex >= 0 ? originalIndex + 1 : ch.order + 1}</p>
                                             <h4 className="font-extrabold truncate text-slate-900 dark:text-white">{ch.title}</h4>
                                         </div>
                                     </div>
