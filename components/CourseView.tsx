@@ -389,60 +389,64 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                   </div>
 
                   <div className="flex items-center justify-center px-4 py-6 perspective-800">
-                      <div className={`relative w-full max-w-sm h-[450px] transition-all duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
+                      <div className={`relative w-full max-w-sm min-h-[350px] transition-all duration-500 transform-style-3d cursor-pointer ${isFlipped ? 'rotate-y-180' : ''}`} onClick={() => setIsFlipped(!isFlipped)}>
                           {/* FRONT - Same structure as back but with front colors */}
-                          <div className="absolute inset-0 backface-hidden bg-white dark:bg-slate-800 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 shadow-2xl border border-slate-100 dark:border-slate-700">
+                          <div className="absolute inset-0 backface-hidden bg-white dark:bg-slate-800 rounded-[2.5rem] flex flex-col items-center justify-between px-8 pt-10 pb-10 shadow-2xl border border-slate-100 dark:border-slate-700 min-h-[350px]">
                               {/* Badge at top - matching back structure */}
-                              <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full mb-8">Tap to Reveal</span>
+                              <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full mb-6">Tap to Reveal</span>
                               
                               {/* Reading - matching back structure but hidden/invisible */}
-                              <p className="text-2xl text-slate-400 dark:text-slate-500 font-medium mb-3 text-center h-[32px]"></p>
+                              <p className="text-xl text-slate-400 dark:text-slate-500 font-medium mb-2 text-center h-[28px]"></p>
                               
                               {/* Main word - matching back meaning position and size */}
-                              <h2 className="text-5xl font-extrabold text-slate-800 dark:text-white text-center mb-6 leading-tight">{currentCard.original}</h2>
-                              
-                              {/* Example sentence placeholder - matching back structure exactly */}
-                              <div className="mb-6 h-[88px] flex items-center justify-center w-full">
-                                  <p className="text-slate-300 dark:text-slate-600 text-sm italic"></p>
+                              <div className="flex-1 flex flex-col items-center justify-center w-full">
+                                  <h2 className="text-4xl font-extrabold text-slate-800 dark:text-white text-center mb-4 leading-tight break-words px-2">{currentCard.original}</h2>
+                                  
+                                  {/* Example sentence placeholder - matching back structure exactly */}
+                                  <div className="mb-4 min-h-[60px] flex items-center justify-center w-full">
+                                      <p className="text-slate-300 dark:text-slate-600 text-sm italic"></p>
+                                  </div>
                               </div>
                               
                               {/* Sound button in same position as back */}
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} 
-                                className="p-4 bg-slate-50 dark:bg-slate-700 rounded-full text-indigo-600 dark:text-indigo-400 hover:scale-110 transition-transform active:bg-indigo-100 shadow-md"
+                                className="p-4 bg-slate-50 dark:bg-slate-700 rounded-full text-indigo-600 dark:text-indigo-400 hover:scale-110 transition-transform active:bg-indigo-100 shadow-md shrink-0"
                               >
                                  {playingText === currentCard.original && audioState === 'LOADING' ? <Loader2 size={24} className="animate-spin" /> : <Volume2 size={28} />}
                               </button>
                           </div>
                           {/* BACK */}
-                          <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] flex flex-col items-center px-8 pt-12 pb-12 rotate-y-180 shadow-2xl text-white relative overflow-hidden">
+                          <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] flex flex-col items-center justify-between px-8 pt-10 pb-10 rotate-y-180 shadow-2xl text-white relative overflow-hidden min-h-[350px]">
                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
                                <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
                               
                               {/* Match exact structure and spacing as front */}
                               {currentCard.partOfSpeech ? (
-                                  <span className="text-xs font-bold text-white/90 uppercase tracking-widest bg-white/20 backdrop-blur-md px-3 py-1 rounded-full mb-8">{currentCard.partOfSpeech}</span>
+                                  <span className="text-xs font-bold text-white/90 uppercase tracking-widest bg-white/20 backdrop-blur-md px-3 py-1 rounded-full mb-6">{currentCard.partOfSpeech}</span>
                               ) : (
-                                  <span className="text-xs font-bold text-transparent uppercase tracking-widest px-3 py-1 rounded-full mb-8">Placeholder</span>
+                                  <span className="text-xs font-bold text-transparent uppercase tracking-widest px-3 py-1 rounded-full mb-6">Placeholder</span>
                               )}
                               
-                              <p className="text-2xl text-white/80 font-medium mb-3 text-center">{currentCard.reading}</p>
-                              <h3 className="text-5xl font-extrabold text-white text-center mb-6 leading-tight">{currentCard.meaning}</h3>
-                              
-                              {currentCard.exampleSentence ? (
-                                  <div className="bg-black/20 backdrop-blur-md p-5 rounded-2xl w-full border border-white/10 mb-6">
-                                      <p className="text-white/90 text-center italic text-lg leading-relaxed">"{currentCard.exampleSentence}"</p>
-                                  </div>
-                              ) : (
-                                  <div className="mb-6 h-[88px] flex items-center justify-center">
-                                      <p className="text-white/50 text-sm italic">No example sentence</p>
-                                  </div>
-                              )}
+                              <div className="flex-1 flex flex-col items-center justify-center w-full">
+                                  <p className="text-xl text-white/80 font-medium mb-2 text-center break-words px-2">{currentCard.reading}</p>
+                                  <h3 className="text-4xl font-extrabold text-white text-center mb-4 leading-tight break-words px-2">{currentCard.meaning}</h3>
+                                  
+                                  {currentCard.exampleSentence ? (
+                                      <div className="bg-black/20 backdrop-blur-md p-4 rounded-2xl w-full border border-white/10 mb-4">
+                                          <p className="text-white/90 text-center italic text-sm leading-relaxed break-words">"{currentCard.exampleSentence}"</p>
+                                      </div>
+                                  ) : (
+                                      <div className="mb-4 min-h-[60px] flex items-center justify-center">
+                                          <p className="text-white/50 text-sm italic">No example sentence</p>
+                                      </div>
+                                  )}
+                              </div>
                               
                               {/* Sound button in same position as front */}
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleSpeak(currentCard.original); }} 
-                                className="p-4 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 hover:scale-110 transition-transform active:bg-white/40 shadow-lg"
+                                className="p-4 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white/30 hover:scale-110 transition-transform active:bg-white/40 shadow-lg shrink-0"
                               >
                                  {playingText === currentCard.original && audioState === 'LOADING' ? <Loader2 size={24} className="animate-spin" /> : <Volume2 size={28} />}
                               </button>
@@ -451,25 +455,22 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                   </div>
                   
                   {/* Action Buttons - Positioned just below card */}
-                  <div className="px-4 py-6 pb-8">
+                  <div className="px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))]">
                       <div className="max-w-sm mx-auto flex justify-between items-center gap-3">
                           <button 
                               onClick={(e) => { e.stopPropagation(); nextCard(false); }} 
-                              className="flex-1 h-20 rounded-2xl bg-white dark:bg-slate-800 border-2 border-red-200 dark:border-red-900/50 shadow-lg shadow-red-500/10 dark:shadow-red-900/20 p-4 flex flex-row items-center justify-center gap-3 active:scale-95 transition-all hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-800 hover:shadow-xl hover:shadow-red-500/20 dark:hover:shadow-red-900/30 group"
+                              className="flex-1 rounded-xl bg-orange-500/80 dark:bg-orange-600/80 backdrop-blur-lg border border-orange-300/50 dark:border-orange-400/30 shadow-lg shadow-orange-500/40 dark:shadow-orange-600/50 px-6 py-3 flex flex-row items-center justify-center gap-2 active:scale-95 transition-all hover:bg-orange-500/90 dark:hover:bg-orange-600/90 hover:shadow-xl hover:shadow-orange-500/50 dark:hover:shadow-orange-600/60 hover:scale-[1.02] relative overflow-hidden group"
                           >
-                              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center group-hover:bg-red-200 dark:group-hover:bg-red-900/60 transition-colors">
-                                  <RotateCcw size={20} className="text-red-600 dark:text-red-300" strokeWidth={2.5} />
-                              </div>
-                              <span className="text-sm font-bold text-red-600 dark:text-red-300 uppercase tracking-wide">Again</span>
+                              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50"></div>
+                              <RotateCcw size={18} className="text-white relative z-10" strokeWidth={2.5} />
+                              <span className="text-sm font-bold text-white relative z-10">Again</span>
                           </button>
                           <button 
                               onClick={(e) => { e.stopPropagation(); nextCard(true); }} 
-                              className="flex-1 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 border-2 border-indigo-400/50 dark:border-indigo-500/50 shadow-lg shadow-indigo-500/30 dark:shadow-indigo-900/40 p-4 flex flex-row items-center justify-center gap-3 active:scale-95 transition-all hover:from-indigo-600 hover:to-purple-700 dark:hover:from-indigo-700 dark:hover:to-purple-800 hover:shadow-xl hover:shadow-indigo-500/40 dark:hover:shadow-indigo-900/50 group"
+                              className="flex-1 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 px-6 py-3 flex flex-row items-center justify-center gap-2 active:scale-95 transition-all hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-500/50"
                           >
-                              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
-                                  <Check size={20} className="text-white" strokeWidth={2.5} />
-                              </div>
-                              <span className="text-sm font-bold text-white uppercase tracking-wide">Got it</span>
+                              <Check size={18} className="text-white" strokeWidth={2.5} />
+                              <span className="text-sm font-bold text-white">Got it</span>
                           </button>
                       </div>
                   </div>
@@ -479,7 +480,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
   }
 
   return (
-    <div className="space-y-6 pb-24 relative">
+    <div className="space-y-6 pb-24 relative -mx-2 md:-mx-0">
       
       {/* TOC Modal */}
       {showTableOfContents && (
@@ -559,15 +560,15 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
       </div>
 
       {currentChapter && (
-          <div className="glass-panel rounded-[2.5rem] overflow-hidden min-h-[60vh] flex flex-col shadow-2xl border border-white/60 dark:border-slate-700 relative">
+          <div className="glass-panel rounded-xl overflow-hidden min-h-[60vh] flex flex-col shadow-2xl border border-white/60 dark:border-slate-700 relative">
              {/* Content Header & Tabs */}
              <div className="bg-white/50 dark:bg-slate-800/50 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 dark:border-slate-700/50">
-                    <div className="p-6 pb-2">
+                    <div className="p-4 md:p-6 pb-2">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chapter {sortedChapters.findIndex(ch => ch.id === currentChapter.id) + 1}</p>
                     <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{currentChapter.title}</h1>
                 </div>
 
-                <div className="px-6 pb-4 overflow-x-auto no-scrollbar">
+                <div className="px-4 md:px-6 pb-4 overflow-x-auto no-scrollbar">
                     <div className="flex p-1.5 bg-slate-100 dark:bg-slate-900/50 rounded-2xl w-max">
                         {(() => {
                             const hasDialogue = (currentChapter.shortDialogue && currentChapter.shortDialogue.length > 0) || 
@@ -623,7 +624,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                  </div>
              </div>
 
-             <div className="p-6 flex-1 bg-white/30 dark:bg-slate-900/20">
+             <div className="p-4 md:p-6 flex-1 bg-white/30 dark:bg-slate-900/20">
                  {/* VIEW: DIALOGUE */}
                  {viewMode === 'dialogue' && (
                      <div className="space-y-6">
@@ -688,9 +689,10 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                                      
                                      <button 
                                         onClick={() => autoPlayIndex !== null ? stopPlayback() : playDialogueSequence(dialogue)}
-                                        className={`fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-6 w-16 h-16 rounded-full shadow-xl shadow-indigo-500/40 hover:scale-110 active:scale-95 transition-all z-20 flex items-center justify-center text-white ${autoPlayIndex !== null ? 'bg-slate-900' : 'bg-indigo-600'}`}
+                                        className={`fixed bottom-[calc(2.7rem+env(safe-area-inset-bottom))] md:bottom-6 right-4 md:right-6 w-14 h-14 md:w-16 md:h-16 rounded-full shadow-xl shadow-indigo-500/40 hover:scale-110 active:scale-95 transition-all z-50 flex items-center justify-center text-white ${autoPlayIndex !== null ? 'bg-slate-900' : 'bg-indigo-600'}`}
+                                        aria-label={autoPlayIndex !== null ? 'Pause dialogue' : 'Play dialogue'}
                                      >
-                                         {autoPlayIndex !== null ? <PauseCircle size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+                                         {autoPlayIndex !== null ? <PauseCircle size={28} className="md:w-8 md:h-8" fill="currentColor" /> : <Play size={28} className="md:w-8 md:h-8 ml-0.5 md:ml-1" fill="currentColor" />}
                                      </button>
                                  </div>
                              )
@@ -721,7 +723,7 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
                              </div>
                         ) : (
                             <>
-                                <div className="flex justify-end mb-6">
+                                <div className="flex justify-center mb-6">
                                     <button onClick={startStudy} className="btn-primary flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 active:scale-95 transition-transform">
                                         <Play size={18} fill="currentColor" /> Start Flashcards
                                     </button>
