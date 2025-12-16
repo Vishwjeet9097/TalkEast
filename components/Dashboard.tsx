@@ -261,17 +261,17 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       try {
           const result = await searchWordMeaning(searchQuery, profile.nativeLanguage, profile.targetLanguage, profile);
           if (!aiSearchAbortRef.current) {
-              setAiResult(result);
+          setAiResult(result);
               setIsLocalWord(false); // AI result, not local
           }
       } catch (e) {
           if (!aiSearchAbortRef.current) {
-              console.error(e);
-              alert("Could not fetch meaning. Please try again.");
+          console.error(e);
+          alert("Could not fetch meaning. Please try again.");
           }
       } finally {
           if (!aiSearchAbortRef.current) {
-              setIsSearchingAI(false);
+          setIsSearchingAI(false);
           }
       }
   };
@@ -363,18 +363,20 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
           <div 
               className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center" 
               style={{
-                  paddingTop: `max(1rem, env(safe-area-inset-top))`,
-                  paddingBottom: `max(1rem, env(safe-area-inset-bottom))`,
+                  paddingTop: `max(calc(5rem + env(safe-area-inset-top) + 0.5rem), calc(82px + env(safe-area-inset-top) + 0.5rem))`,
+                  paddingBottom: `max(calc(7rem + env(safe-area-inset-bottom) + 0.5rem), calc(112px + env(safe-area-inset-bottom) + 0.5rem))`,
                   paddingLeft: '1rem',
                   paddingRight: '1rem'
               }}
               onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }}
           >
               <div 
-                  className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden flex flex-col" 
+                  className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden flex flex-col my-auto" 
                   style={{
-                      maxHeight: `calc(100vh - max(2rem, env(safe-area-inset-top) + 1rem) - max(2rem, env(safe-area-inset-bottom) + 1rem))`,
-                      height: 'auto'
+                      maxHeight: `min(calc(100vh - max(calc(5rem + env(safe-area-inset-top) + 0.5rem), calc(82px + env(safe-area-inset-top) + 0.5rem)) - max(calc(7rem + env(safe-area-inset-bottom) + 0.5rem), calc(112px + env(safe-area-inset-bottom) + 0.5rem))), 90vh)`,
+                      minHeight: 'min(400px, calc(100vh - 200px))',
+                      height: 'auto',
+                      maxWidth: 'calc(100vw - 2rem)'
                   }}
                   onClick={e => e.stopPropagation()}
               >
@@ -388,7 +390,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                   
                   {/* Fully Scrollable Content */}
                   <div className="overflow-y-auto custom-scrollbar flex-1 min-h-0">
-                      <div className="p-6 space-y-6 pb-8">
+                      <div className="p-6 space-y-6" style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))' }}>
                           {/* Header Section */}
                           <div className="text-center pt-2">
                               <div className="flex items-center justify-center gap-2 mb-4">
@@ -398,7 +400,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                                   {isLocalWord && (
                                       <span className="inline-block px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">
                                         Local
-                                      </span>
+                      </span>
                                   )}
                               </div>
                               <div className="flex items-center justify-center gap-3 mb-3">
@@ -424,21 +426,21 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                               {aiResult.pinyinWithTones && (
                                   <p className="text-lg text-indigo-500 font-medium font-serif">{aiResult.pinyinWithTones}</p>
                               )}
-                          </div>
+                  </div>
 
                           {/* Meaning Section */}
-                          <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-800/50 p-5 rounded-2xl border border-indigo-100 dark:border-slate-700">
+                      <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-800/50 p-5 rounded-2xl border border-indigo-100 dark:border-slate-700">
                               <p className="text-[10px] text-indigo-400 mb-2 uppercase font-bold tracking-wider">{profile?.nativeLanguage}</p>
-                              <p className="font-bold text-xl text-slate-800 dark:text-white leading-snug">{aiResult.meaning}</p>
-                          </div>
+                          <p className="font-bold text-xl text-slate-800 dark:text-white leading-snug">{aiResult.meaning}</p>
+                      </div>
 
                           {/* English Meaning (if available) */}
-                          {aiResult.englishMeaning && (
-                              <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                      {aiResult.englishMeaning && (
+                          <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
                                   <p className="text-[10px] text-slate-400 mb-2 uppercase font-bold tracking-wider">English</p>
                                   <p className="font-medium text-slate-700 dark:text-slate-200 leading-relaxed">{aiResult.englishMeaning}</p>
-                              </div>
-                          )}
+                          </div>
+                      )}
 
                           {/* Context Examples - Max 2 */}
                           {aiResult.examples && aiResult.examples.length > 0 && (
@@ -475,8 +477,8 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                                         </div>
                                       );
                                     })}
-                                  </div>
-                              </div>
+                                </div>
+                          </div>
                           )}
                       </div>
                   </div>

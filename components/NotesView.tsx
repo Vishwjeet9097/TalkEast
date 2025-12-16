@@ -617,54 +617,104 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                   if ((e.target as HTMLElement).closest('.note-menu')) return;
                   openNote(note);
                 }} 
-                className={`relative group rounded-2xl cursor-pointer transition-all duration-300 border overflow-hidden backdrop-blur-xl
+                className={`relative group rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden backdrop-blur-xl
                   ${isDragging ? 'opacity-50 scale-95' : ''}
                   ${isDragOver ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900 scale-105' : ''}
-                  ${noteColor ? '' : 'bg-white/90 dark:bg-slate-800/90 border-slate-200/60 dark:border-slate-700/60'}
+                  ${noteColor 
+                    ? 'bg-black dark:bg-black border-2' 
+                    : 'bg-white/90 dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700/60'
+                  }
                   hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02]
                   shadow-lg shadow-slate-200/50 dark:shadow-slate-900/50
                 `}
                 style={noteColor ? { 
-                  backgroundColor: `${noteColor}dd`,
-                  borderColor: `${noteColor}80`,
+                  borderColor: noteColor,
+                  borderWidth: '2px',
+                  boxShadow: `
+                    0 0 0 1px ${noteColor}40,
+                    0 0 20px ${noteColor}30,
+                    0 0 40px ${noteColor}20,
+                    0 8px 16px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 0 ${noteColor}60,
+                    inset 0 -1px 0 ${noteColor}40
+                  `,
                   backdropFilter: 'blur(20px)',
-                  boxShadow: `0 20px 25px -5px ${noteColor}20, 0 10px 10px -5px ${noteColor}10, inset 0 1px 0 ${noteColor}40`
                 } : {
                   boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
                 }}
               >
-                  {/* Left Color Accent */}
+                  {/* 3D Glass Effect Border - Top Glow */}
+                  {noteColor && (
+                    <>
+                      <div 
+                        className="absolute inset-0 rounded-2xl pointer-events-none"
+                        style={{ 
+                          background: `linear-gradient(135deg, ${noteColor}20 0%, transparent 50%, ${noteColor}10 100%)`,
+                          boxShadow: `inset 0 2px 4px ${noteColor}30, inset 0 -1px 2px ${noteColor}20`
+                        }}
+                      />
+                      {/* Animated Glow Effect */}
+                      <div 
+                        className="absolute inset-0 rounded-2xl pointer-events-none opacity-60 animate-pulse"
+                        style={{ 
+                          background: `radial-gradient(circle at 50% 0%, ${noteColor}40 0%, transparent 70%)`,
+                        }}
+                      />
+                    </>
+                  )}
+                  
+                  {/* Left Color Accent with Enhanced Glow */}
                   {noteColor && (
                     <div 
-                      className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl"
+                      className="absolute left-0 top-0 bottom-0 w-2 rounded-l-2xl"
                       style={{ 
                         backgroundColor: noteColor,
-                        boxShadow: `0 0 10px ${noteColor}40`
+                        boxShadow: `
+                          0 0 10px ${noteColor}60,
+                          0 0 20px ${noteColor}40,
+                          inset 0 0 10px ${noteColor}80
+                        `
                       }}
                     />
                   )}
                   
-                  {/* Glass Overlay Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/5 pointer-events-none rounded-2xl"></div>
+                  {/* Glass Overlay Effect - Subtle for dark mode */}
+                  <div className={`absolute inset-0 pointer-events-none rounded-2xl ${
+                    noteColor 
+                      ? 'bg-gradient-to-br from-transparent via-transparent to-black/20' 
+                      : 'bg-gradient-to-br from-white/20 to-transparent dark:from-white/5'
+                  }`}></div>
                   
                   {/* Card Content */}
-                  <div className="p-5 relative z-10">
+                  <div className={`p-5 relative z-10 ${noteColor ? 'bg-black/80 dark:bg-black/90' : ''}`}>
                     {/* Header Row */}
                     <div className="flex items-start justify-between gap-3 mb-4">
                       <div className="flex items-start gap-2 flex-1 min-w-0">
                         {/* Drag Handle */}
                         <div 
-                          className="cursor-grab active:cursor-grabbing text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 transition-colors shrink-0 mt-0.5"
+                          className={`cursor-grab active:cursor-grabbing transition-colors shrink-0 mt-0.5 ${
+                            noteColor 
+                              ? 'text-slate-300 dark:text-slate-400 hover:text-white dark:hover:text-slate-200' 
+                              : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'
+                          }`}
                           onMouseDown={(e) => e.stopPropagation()}
                         >
                           <GripVertical size={16} />
                         </div>
                         {note.pinned && (
-                          <Pin size={16} className="text-indigo-600 dark:text-indigo-400 fill-indigo-600 dark:fill-indigo-400 shrink-0 mt-0.5" />
+                          <Pin size={16} className={`shrink-0 mt-0.5 ${
+                            noteColor 
+                              ? 'text-indigo-400 dark:text-indigo-300 fill-indigo-400 dark:fill-indigo-300' 
+                              : 'text-indigo-600 dark:text-indigo-400 fill-indigo-600 dark:fill-indigo-400'
+                          }`} />
                         )}
                         <div className="flex-1 min-w-0">
                           {/* Title - More Prominent */}
-                          <h3 className="font-extrabold text-xl text-slate-900 dark:text-slate-50 leading-tight mb-2 line-clamp-2 tracking-tight">
+                          <h3 className={`font-extrabold text-xl leading-tight mb-2 line-clamp-2 tracking-tight ${
+                            noteColor 
+                              ? 'text-white dark:text-slate-100' 
+                              : 'text-slate-900 dark:text-slate-50'
+                          }`}>
                             {note.title}
                           </h3>
                     </div>
@@ -752,13 +802,21 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                     </div>
                     
                     {/* Divider between Title and Content */}
-                    <div className="h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent mb-3"></div>
+                    <div className={`h-px bg-gradient-to-r from-transparent to-transparent mb-3 ${
+                      noteColor 
+                        ? 'via-slate-600 dark:via-slate-500' 
+                        : 'via-slate-200 dark:via-slate-700'
+                    }`}></div>
                     
                     {/* Tags */}
                   {note.tags && note.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-3">
                       {note.tags.map(tag => (
-                          <span key={tag} className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200/60 dark:border-indigo-800/60">
+                          <span key={tag} className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-lg border ${
+                            noteColor
+                              ? 'bg-indigo-900/40 dark:bg-indigo-900/50 text-indigo-300 dark:text-indigo-200 border-indigo-700/60 dark:border-indigo-600/60'
+                              : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200/60 dark:border-indigo-800/60'
+                          }`}>
                           #{tag}
                         </span>
                       ))}
@@ -767,24 +825,43 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
 
                     {/* Content Preview - More Distinct */}
                     <div className="mb-4">
-                      <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
+                      <div className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                        noteColor 
+                          ? 'text-slate-400 dark:text-slate-400' 
+                          : 'text-slate-400 dark:text-slate-500'
+                      }`}>
                         Content
                       </div>
                       <div 
-                        className="text-slate-700 dark:text-slate-200 line-clamp-3 text-sm leading-relaxed min-h-[3.5rem] prose prose-sm dark:prose-invert max-w-none"
-                        dangerouslySetInnerHTML={{ __html: note.content || "<span class='text-slate-400 dark:text-slate-500 italic'>No content</span>" }}
+                        className={`line-clamp-3 text-sm leading-relaxed min-h-[3.5rem] prose prose-sm dark:prose-invert max-w-none ${
+                          noteColor 
+                            ? 'text-slate-200 dark:text-slate-200' 
+                            : 'text-slate-700 dark:text-slate-200'
+                        }`}
+                        dangerouslySetInnerHTML={{ __html: note.content || `<span class='${noteColor ? 'text-slate-500 dark:text-slate-500' : 'text-slate-400 dark:text-slate-500'} italic'>No content</span>` }}
                   />
                     </div>
                     
                     {/* Footer */}
-                    <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700/50">
-                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <div className={`flex items-center justify-between pt-3 border-t ${
+                      noteColor 
+                        ? 'border-slate-700 dark:border-slate-600' 
+                        : 'border-slate-100 dark:border-slate-700/50'
+                    }`}>
+                      <span className={`text-xs font-medium ${
+                        noteColor 
+                          ? 'text-slate-400 dark:text-slate-400' 
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}>
                         {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                       {selectedColor && (
                         <div 
-                          className="w-2.5 h-2.5 rounded-full shadow-sm"
-                          style={{ backgroundColor: selectedColor.value }}
+                          className="w-2.5 h-2.5 rounded-full shadow-lg"
+                          style={{ 
+                            backgroundColor: selectedColor.value,
+                            boxShadow: `0 0 8px ${selectedColor.value}60, 0 0 4px ${selectedColor.value}40`
+                          }}
                           title={selectedColor.name}
                         />
                       )}
