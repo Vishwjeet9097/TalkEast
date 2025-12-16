@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { UserProfile } from '../types';
 import { getApiKeyForProfile } from '../services/gemini';
@@ -74,6 +74,7 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
   const [greetingText, setGreetingText] = useState<string>('');
   const hasUserSpokenRef = useRef(false);
   const activeSessionRef = useRef<any>(null);
+  const actualSessionRef = useRef<any>(null);
   
   // Get status-based colors
   const getStatusColors = () => {
@@ -122,20 +123,120 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
   const currentYRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    if (!isOpen) {
-      stopSession();
+  // Define stopSession before useEffect that uses it
+  const stopSession = useCallback(async () => {
+      // Prevent multiple simultaneous stop calls
+      if (!activeSessionRef.current && !actualSessionRef.current && !streamRef.current) {
+          return; // Already stopped
+      }
+      
+      // Immediately set status to prevent conflicts
       setStatus('idle');
+      onActiveChange(false);
+      
+      // Stop all audio sources first
+      sourcesRef.current.forEach(s => {
+          try {
+              s.stop();
+          } catch (e) {
+              console.warn('Error stopping audio source:', e);
+          }
+      });
+      sourcesRef.current.clear();
+      nextStartTimeRef.current = 0;
+      
+      // Stop script processor
+      if (scriptProcessorRef.current) {
+          try {
+              scriptProcessorRef.current.disconnect();
+          } catch (e) {
+              console.warn('Error disconnecting script processor:', e);
+          }
+          scriptProcessorRef.current = null;
+      }
+      
+      // Stop media stream
+      if (streamRef.current) {
+          try {
+              streamRef.current.getTracks().forEach(t => {
+                  t.stop();
+                  t.enabled = false;
+              });
+          } catch (e) {
+              console.warn('Error stopping stream tracks:', e);
+          }
+          streamRef.current = null;
+      }
+      
+      // Close Live API session
+      if (actualSessionRef.current) {
+          try {
+              // Try to close the session properly
+              if (typeof actualSessionRef.current.close === 'function') {
+                  await actualSessionRef.current.close();
+              } else if (typeof actualSessionRef.current.disconnect === 'function') {
+                  await actualSessionRef.current.disconnect();
+              }
+          } catch (e) {
+              console.warn('Error closing Live API session:', e);
+          }
+          actualSessionRef.current = null;
+      }
+      
+      // Also try to close via promise
+      if (activeSessionRef.current) {
+          try {
+              const session = await activeSessionRef.current;
+              if (session) {
+                  if (typeof session.close === 'function') {
+                      await session.close();
+                  } else if (typeof session.disconnect === 'function') {
+                      await session.disconnect();
+                  }
+              }
+          } catch (e) {
+              console.warn('Error closing session promise:', e);
+          }
+          activeSessionRef.current = null;
+      }
+      
+      // Close audio contexts
+      if (inputAudioContextRef.current) {
+          try {
+              await inputAudioContextRef.current.close();
+          } catch (e) {
+              console.warn('Error closing input audio context:', e);
+          }
+          inputAudioContextRef.current = null;
+      }
+      
+      if (outputAudioContextRef.current) {
+          try {
+              await outputAudioContextRef.current.close();
+          } catch (e) {
+              console.warn('Error closing output audio context:', e);
+          }
+          outputAudioContextRef.current = null;
+      }
+      
+      // Reset all state
+      hasUserSpokenRef.current = false;
+      sessionStartedRef.current = false;
+      setIsFirstInteraction(true);
+      setGreetingText('');
       setTranscription('');
       setConversationMessages([]);
-      setIsFirstInteraction(true);
       setUserLanguagePreference(null);
-      sessionStartedRef.current = false;
-      setGreetingText('');
-      hasUserSpokenRef.current = false;
-      activeSessionRef.current = null;
+  }, [onActiveChange]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      // Immediately stop session when modal closes
+      stopSession().catch(e => {
+        console.warn('Error stopping session on modal close:', e);
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, stopSession]);
 
   // Save conversation to notes
   const handleSaveToNotes = async () => {
@@ -271,6 +372,47 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
         alert("API key नहीं मिला। प्रोफ़ाइल में जोड़ें या env.local सेट करें।");
         return;
     }
+    
+    // Load courses data for AI access
+    let coursesData = '';
+    try {
+        await db.init();
+        const courses = await db.getCourses();
+        const filteredCourses = courses.filter(c => 
+            !c.targetLanguage || c.targetLanguage === profile.targetLanguage
+        );
+        
+        if (filteredCourses.length > 0) {
+            coursesData = '\n\nAVAILABLE COURSES AND CONTENT:\n';
+            filteredCourses.forEach(course => {
+                coursesData += `\nCourse: "${course.title}"\n`;
+                course.chapters.forEach(chapter => {
+                    coursesData += `  Chapter ${chapter.order}: "${chapter.title}"\n`;
+                    if (chapter.vocab && chapter.vocab.length > 0) {
+                        coursesData += `    Vocabulary (${chapter.vocab.length} words):\n`;
+                        chapter.vocab.slice(0, 20).forEach(word => {
+                            coursesData += `      - ${word.original}${word.reading ? ` (${word.reading})` : ''} - ${word.meaning}\n`;
+                        });
+                        if (chapter.vocab.length > 20) {
+                            coursesData += `      ... and ${chapter.vocab.length - 20} more words\n`;
+                        }
+                    }
+                    if (chapter.grammar && chapter.grammar.length > 0) {
+                        coursesData += `    Grammar Points: ${chapter.grammar.length}\n`;
+                    }
+                });
+            });
+            coursesData += '\nYou have FULL ACCESS to all this course content. When the user asks to practice vocabulary from a specific chapter, you can:\n';
+            coursesData += '- List vocabulary words from that chapter\n';
+            coursesData += '- Quiz them on words (ask them to translate, use in sentences, etc.)\n';
+            coursesData += '- Provide examples and context for words\n';
+            coursesData += '- Help them practice pronunciation\n';
+            coursesData += '- Create practice exercises based on the course content\n';
+        }
+    } catch (e) {
+        console.warn('Error loading courses for AI:', e);
+    }
+    
     const ai = new GoogleGenAI({ apiKey });
     setStatus('connecting');
     onActiveChange(true);
@@ -300,6 +442,11 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
                     setIsFirstInteraction(true);
                     hasUserSpokenRef.current = true; // Allow greeting audio immediately
                     
+                    // Store actual session object
+                    sessionPromise.then(session => {
+                        actualSessionRef.current = session;
+                    });
+                    
                     // Setup audio processing
                     const source = inputAudioContext.createMediaStreamSource(stream);
                     const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
@@ -308,20 +455,28 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
                     scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
                         const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
                         const pcmBlob = createBlob(inputData);
-                        sessionPromise.then(session => {
-                            session.sendRealtimeInput({ media: pcmBlob });
-                        });
+                        if (actualSessionRef.current) {
+                            try {
+                                actualSessionRef.current.sendRealtimeInput({ media: pcmBlob });
+                            } catch (e) {
+                                console.warn('Error sending audio input:', e);
+                            }
+                        }
                     };
                     source.connect(scriptProcessor);
                     scriptProcessor.connect(inputAudioContext.destination);
                     
                     // Trigger greeting by sending a minimal audio signal
                     setTimeout(() => {
-                        sessionPromise.then(session => {
-                            const greetingTrigger = new Float32Array(800).fill(0.001);
-                            const greetingBlob = createBlob(greetingTrigger);
-                            session.sendRealtimeInput({ media: greetingBlob });
-                        });
+                        if (actualSessionRef.current) {
+                            try {
+                                const greetingTrigger = new Float32Array(800).fill(0.001);
+                                const greetingBlob = createBlob(greetingTrigger);
+                                actualSessionRef.current.sendRealtimeInput({ media: greetingBlob });
+                            } catch (e) {
+                                console.warn('Error sending greeting trigger:', e);
+                            }
+                        }
                     }, 500);
                 },
                 onmessage: async (message: LiveServerMessage) => {
@@ -386,6 +541,9 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
                      }
                 },
                 onclose: () => {
+                    // Clean up on close
+                    actualSessionRef.current = null;
+                    activeSessionRef.current = null;
                     setStatus('idle');
                     onActiveChange(false);
                 },
@@ -404,8 +562,8 @@ export default function LiveVoiceModal({ profile, isOpen, onClose, onActiveChang
 
 CRITICAL FIRST INTERACTION PROTOCOL:
 When the conversation begins (this is the FIRST thing you MUST say with audio immediately):
-1. Greet warmly in ${profile.nativeLanguage === 'हिन्दी' || profile.nativeLanguage === 'Hindi' ? 'Hindi' : profile.nativeLanguage}: 
-   - If native language is Hindi: "Hi! Main TalkEast hoon, aapki personal AI assistant. Kya aap Hindi mein baat karne mein sakham hain?"
+1. Greet warmly in ${profile.nativeLanguage === 'Hindi' ? 'Hindi' : profile.nativeLanguage}: 
+   - If native language is Hindi: "Hi! Main TalkEast hoon, aapki personal AI assistant. Kya aap Hindi mein baat karne mein saksham hain?"
    - If they say "haan" or "yes", IMMEDIATELY ask: "Main aapki kaise sahayta kar sakti hoon?"
    - If they say "nahi" or prefer ${profile.targetLanguage}, switch to that language and ask how you can help
 2. Wait for their response and then begin the conversation naturally
@@ -427,11 +585,23 @@ LANGUAGE PRACTICE MODE:
 - If they choose ${profile.targetLanguage}: Help them practice, correct mistakes gently, provide examples, give encouragement
 - If they choose ${profile.nativeLanguage}: Have natural conversations about language learning, answer questions about ${profile.targetLanguage}, provide explanations
 
+COURSE CONTENT ACCESS:
+${coursesData || 'No courses available yet. The user can upload PDFs to create courses.'}
+
+When the user asks to practice vocabulary from a chapter or course:
+- You have FULL ACCESS to all course content listed above
+- You can quiz them on vocabulary words from any chapter
+- You can provide examples, translations, and context for words
+- You can create practice exercises based on course content
+- Be specific about which chapter and words you're using
+- Make practice engaging and interactive
+
 GENERAL BEHAVIOR:
 - Adapt to their language level and learning needs
 - Ask engaging follow-up questions
 - Provide helpful, constructive feedback
 - Be supportive and positive
+- Use course content when relevant to help them practice
 
 Remember: You MUST start every new conversation with the greeting and language preference question. This is non-negotiable.`
             }
@@ -439,61 +609,12 @@ Remember: You MUST start every new conversation with the greeting and language p
 
         sessionRef.current = sessionPromise;
         activeSessionRef.current = sessionPromise;
-        
-        // Store session close function
-        sessionPromise.then(session => {
-            sessionRef.current = {
-                close: () => {
-                    stream.getTracks().forEach(t => t.stop());
-                    activeSessionRef.current = null;
-                }
-            };
-        });
 
     } catch (e) {
         console.error("Mic access denied or API error", e);
         setStatus('idle');
         onActiveChange(false);
     }
-  };
-
-  const stopSession = async () => {
-      // Stop all audio sources
-      sourcesRef.current.forEach(s => s.stop());
-      sourcesRef.current.clear();
-      
-      // Close session if exists
-      if (activeSessionRef.current) {
-          try {
-              const session = await activeSessionRef.current;
-              if (session && typeof session.close === 'function') {
-                  session.close();
-              }
-          } catch (e) {
-              console.warn('Error closing session:', e);
-          }
-          activeSessionRef.current = null;
-      }
-      
-      if (streamRef.current) {
-          streamRef.current.getTracks().forEach(t => t.stop());
-          streamRef.current = null;
-      }
-      if (scriptProcessorRef.current) {
-          scriptProcessorRef.current.disconnect();
-          scriptProcessorRef.current = null;
-      }
-      if (inputAudioContextRef.current) {
-          inputAudioContextRef.current.close();
-          inputAudioContextRef.current = null;
-      }
-      if (outputAudioContextRef.current) {
-          outputAudioContextRef.current.close();
-          outputAudioContextRef.current = null;
-      }
-      setStatus('idle');
-      onActiveChange(false);
-      hasUserSpokenRef.current = false;
   };
 
   if (!isOpen) return null;
