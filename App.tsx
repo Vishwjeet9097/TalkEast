@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { db } from './services/storage';
 import { NotificationService } from './services/notifications';
+import { PermissionService } from './services/permissions';
 import { UserProfile, Language } from './types';
 import { BookOpen, Mic, PenTool, Layout, Plus, Sparkles, ChevronDown, Check, Home, BrainCircuit, Sun, Moon, UserRound, MessageSquare } from 'lucide-react';
 import { ProcessingProvider } from './context/ProcessingContext';
@@ -80,11 +81,95 @@ export default function App() {
       setProfile(normalized);
       setLoading(false);
         
+        // Check if this is first launch (no profile or onboarding not complete)
+        const isFirstLaunch = !normalized || !normalized.onboardingComplete;
+        
+        // Request permissions on first launch
+        if (isFirstLaunch) {
+          try {
+            // Check current permission status
+            const permissionStatus = await PermissionService.checkPermissions();
+            
+            console.log('First launch - Permission status:', permissionStatus);
+            
+            // Request notification permission if not granted
+            if (permissionStatus.notifications !== 'granted') {
+              console.log('Requesting notification permission on first launch...');
+              try {
+                await PermissionService.requestNotificationPermission();
+              } catch (err) {
+                console.warn('Failed to request notification permission:', err);
+              }
+            }
+            
+            // Request microphone permission if not granted
+            // Small delay to avoid showing multiple dialogs at once
+            if (permissionStatus.microphone !== 'granted') {
+              console.log('Requesting microphone permission on first launch...');
+              setTimeout(async () => {
+                try {
+                  await PermissionService.requestMicrophonePermission();
+                } catch (err) {
+                  console.warn('Failed to request microphone permission:', err);
+                }
+              }, 1000); // 1 second delay after notification permission
+            }
+          } catch (permError) {
+            console.warn('Permission request error on first launch:', permError);
+          }
+        } else {
+          // For returning users, check and request notifications if needed
+          try {
+            const permissionStatus = await PermissionService.checkPermissions();
+            if (permissionStatus.notifications !== 'granted') {
+              await NotificationService.requestPermission();
+            }
+          } catch (notifError) {
+            console.warn('Notification permission error:', notifError);
+          }
+        }
+        
+        // Setup notifications (only if permission granted)
         try {
-      NotificationService.requestPermission();
+          await NotificationService.requestPermission();
+          // Check and reset daily status if new day
+          await NotificationService.checkAndResetDailyStatus();
+          // Start hourly reminders for daily review
+          await NotificationService.startHourlyReminders();
         } catch (notifError) {
           console.warn('Notification permission error:', notifError);
         }
+        
+        // Handle visibility change - restart reminders when app becomes visible
+        const handleVisibilityChange = async () => {
+          if (!document.hidden) {
+            try {
+              await NotificationService.checkAndResetDailyStatus();
+              await NotificationService.restartHourlyReminders();
+            } catch (error) {
+              console.warn('Error restarting reminders on visibility change:', error);
+            }
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // Also handle focus event
+        const handleFocus = async () => {
+          try {
+            await NotificationService.checkAndResetDailyStatus();
+            await NotificationService.restartHourlyReminders();
+          } catch (error) {
+            console.warn('Error restarting reminders on focus:', error);
+          }
+        };
+        
+        window.addEventListener('focus', handleFocus);
+        
+        return () => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          window.removeEventListener('focus', handleFocus);
+        };
       
       // System-first theme detection
       const applyTheme = (themePref: 'light' | 'dark' | 'system' | undefined) => {
@@ -224,6 +309,7 @@ export default function App() {
           <div className="mesh-bg light-mesh dark:hidden"></div>
           <div className="mesh-bg hidden dark:block bg-slate-900"></div>
           
+          {/* Global Status Progress Bar - Above Header */}
           <GlobalStatus />
 
           {/* App Header - Fixed at top */}
@@ -240,7 +326,7 @@ export default function App() {
                 />
                 <Route 
                   path="/onboarding" 
-                  element={<Onboarding onComplete={handleProfileUpdate} />} 
+                  element={<div className="fixed inset-0"><Onboarding onComplete={handleProfileUpdate} /></div>} 
                 />
                 <Route 
                   path="/dashboard" 
@@ -309,8 +395,9 @@ export default function App() {
 function FloatingAIWidgetWrapper({ profile }: { profile: UserProfile | null }) {
   const location = useLocation();
   
-  // Hide on chat page
-  if (location.pathname === '/chat') {
+  // Hide on chat and onboarding pages
+  const hidePaths = ['/chat', '/onboarding'];
+  if (hidePaths.includes(location.pathname)) {
     return null;
   }
   
@@ -328,7 +415,7 @@ const MainLayout = ({
 }) => {
     return (
         <div className="max-w-md mx-auto md:max-w-5xl min-h-screen relative flex flex-col">
-            <main className="px-5 relative z-10 flex-1 pt-[calc(5rem+env(safe-area-inset-top))] pb-28">
+            <main className="px-5 relative z-10 flex-1 pt-[calc(5rem+env(safe-area-inset-top)+10px)] pb-28">
                 {children}
             </main>
         </div>

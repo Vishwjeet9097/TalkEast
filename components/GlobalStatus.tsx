@@ -1,13 +1,38 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProcessing } from '../context/ProcessingContext';
-import { Loader2, CheckCircle, XCircle, ChevronRight, PauseCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { db } from '../services/storage';
 
 export default function GlobalStatus() {
-  const { state, statusMessage, progress, activeTaskName, resetJob, error } = useProcessing();
+  const { state, progress, resetJob, activeJobId } = useProcessing();
   const navigate = useNavigate();
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Fetch job data to get actual batch counts
+  useEffect(() => {
+    if (activeJobId && state !== 'IDLE') {
+      const fetchJobData = async () => {
+        try {
+          const job = await db.getJob(activeJobId);
+          if (job) {
+            setProcessedCount(job.processedBatches?.length || 0);
+            setTotalCount(job.totalBatches || 0);
+          }
+        } catch (error) {
+          console.warn('Error fetching job data:', error);
+        }
+      };
+      fetchJobData();
+      // Update periodically
+      const interval = setInterval(fetchJobData, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setProcessedCount(0);
+      setTotalCount(0);
+    }
+  }, [activeJobId, state]);
 
   if (state === 'IDLE') return null;
 
@@ -16,146 +41,43 @@ export default function GlobalStatus() {
   const isPaused = state === 'paused';
 
   const handleClick = () => {
-    if (isComplete) {
+    if (isComplete || isError || isPaused) {
       resetJob();
-      navigate('/dashboard'); 
-    } else if (isError || isPaused) {
-      // Navigate to dashboard where they can manage the job
       navigate('/dashboard'); 
     }
   };
 
-  const handleMinimize = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMinimized(!isMinimized);
-  };
-
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isComplete || isError) {
-      resetJob();
-    }
-  };
+  // Use actual batch counts if available, otherwise use progress-based estimate
+  const displayProcessed = totalCount > 0 ? processedCount : Math.round(progress);
+  const displayTotal = totalCount > 0 ? totalCount : 100;
 
   return (
-    <>
-      {isMinimized ? (
-        // Floating Icon Only
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-50">
-          <button
-            onClick={handleMinimize}
-            className={`w-14 h-14 rounded-full shadow-2xl border-2 backdrop-blur-xl transition-all duration-300 flex items-center justify-center hover:scale-110 active:scale-95 ${
-              isError ? 'bg-red-500/90 dark:bg-red-600/90 border-red-300 text-white' : 
-              isPaused ? 'bg-amber-500/90 dark:bg-amber-600/90 border-amber-300 text-white' :
-              isComplete ? 'bg-green-500/90 dark:bg-green-600/90 border-green-300 text-white' : 
-              'bg-indigo-500/90 dark:bg-indigo-600/90 border-indigo-300 text-white'
-            }`}
-            title={isError ? 'Processing Failed - Click to expand' : isPaused ? 'Processing Paused - Click to expand' : activeTaskName}
-          >
-            {state === 'processing' && <Loader2 className="animate-spin" size={24} />}
-            {isComplete && <CheckCircle size={24} />}
-            {isError && <XCircle size={24} />}
-            {isPaused && <PauseCircle size={24} />}
-          </button>
-          {/* Progress Ring (when processing/paused) */}
-          {!isComplete && !isError && (
-            <svg className="absolute inset-0 -rotate-90" width="56" height="56">
-              <circle
-                cx="28"
-                cy="28"
-                r="26"
-                fill="none"
-                stroke="rgba(255,255,255,0.2)"
-                strokeWidth="2"
-              />
-              <circle
-                cx="28"
-                cy="28"
-                r="26"
-                fill="none"
-                stroke="white"
-                strokeWidth="2"
-                strokeDasharray={`${2 * Math.PI * 26}`}
-                strokeDashoffset={`${2 * Math.PI * 26 * (1 - progress / 100)}`}
-                className="transition-all duration-500"
-              />
-            </svg>
-          )}
+    <div 
+      className="fixed top-0 left-0 right-0 z-[35] transition-all duration-300 bg-indigo-500/95 backdrop-blur-sm"
+      style={{ 
+        paddingTop: 'env(safe-area-inset-top)',
+        height: '10px',
+        maxHeight: '10px'
+      }}
+      onClick={handleClick}
+    >
+      <div className="max-w-md mx-auto md:max-w-5xl px-6 h-full flex items-center justify-between cursor-pointer">
+        {/* Data Count and Percentage */}
+        <div className="flex items-center gap-1.5 text-[8px] font-bold text-white leading-none">
+          <span>{displayProcessed}</span>
+          <span className="opacity-70">/</span>
+          <span className="opacity-70">{displayTotal}</span>
+          <span className="ml-1 opacity-80">{progress}%</span>
         </div>
-      ) : (
-        // Expanded Card View
-        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-96 z-50">
+
+        {/* Progress Bar */}
+        <div className="flex-1 h-full bg-black/20 dark:bg-black/30 ml-2 rounded-full overflow-hidden">
           <div 
-            className={`glass-panel p-3 rounded-2xl shadow-2xl border border-white/40 dark:border-white/10 backdrop-blur-xl transition-all duration-300 transform translate-y-0 ${
-              isError ? 'bg-red-50/90 dark:bg-red-900/40 border-red-200' : 
-              isPaused ? 'bg-amber-50/90 dark:bg-amber-900/40 border-amber-200' :
-              isComplete ? 'bg-green-50/90 dark:bg-green-900/40 border-green-200' : 
-              'bg-white/90 dark:bg-slate-800/90'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {/* Icon State */}
-              <div className="shrink-0">
-                {state === 'processing' && <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={24} />}
-                {isComplete && <CheckCircle className="text-green-600 dark:text-green-400" size={24} />}
-                {isError && <XCircle className="text-red-500" size={24} />}
-                {isPaused && <PauseCircle className="text-amber-500" size={24} />}
-              </div>
-
-              {/* Text Content - Clickable for navigation */}
-              <div 
-                className="flex-1 min-w-0 cursor-pointer"
-                onClick={handleClick}
-              >
-                <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate">
-                  {isError ? 'Processing Failed' : isPaused ? 'Processing Paused' : activeTaskName}
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-300 truncate">
-                   {isError ? error : statusMessage}
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleMinimize}
-                  className="p-1.5 rounded-lg hover:bg-white/50 dark:hover:bg-slate-700/50 transition-colors"
-                  title="Minimize to icon"
-                >
-                  <ChevronRight size={18} className="text-slate-400" />
-                </button>
-                {(isComplete || isError) && (
-                  <button
-                    onClick={handleDismiss}
-                    className="p-1.5 rounded-lg hover:bg-white/50 dark:hover:bg-slate-700/50 transition-colors"
-                    title="Dismiss"
-                  >
-                    <X size={18} className="text-slate-400" />
-                  </button>
-                )}
-                {!isComplete && !isError && (
-                  <div 
-                    onClick={handleClick}
-                    className="p-1.5 cursor-pointer"
-                  >
-                    <ChevronRight size={18} className="text-slate-400" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Progress Bar (Only when processing or paused) */}
-            {!isComplete && !isError && (
-              <div className="mt-3 h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all duration-500 ease-out ${isPaused ? 'bg-amber-400' : 'bg-indigo-600 dark:bg-indigo-400'}`}
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-            )}
-          </div>
+            className="h-full bg-indigo-400 dark:bg-indigo-500 transition-all duration-500 ease-out rounded-full"
+            style={{ width: `${progress}%` }}
+          ></div>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }

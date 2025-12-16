@@ -96,7 +96,14 @@ export default function CourseView({ profile }: { profile: UserProfile | null })
     loadCourse();
     
     return () => {
-        cancel();
+        // Safely cancel TTS if available
+        if (cancel && typeof cancel === 'function') {
+          try {
+            cancel();
+          } catch (error) {
+            console.warn('Error canceling TTS in cleanup:', error);
+          }
+        }
         if (dialogueTimeoutRef.current) clearTimeout(dialogueTimeoutRef.current);
     };
   }, [courseId, location.state, cancel]);

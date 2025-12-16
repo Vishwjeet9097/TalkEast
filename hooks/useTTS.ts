@@ -15,11 +15,22 @@ export const useTTS = () => {
   const [currentText, setCurrentText] = useState<string | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // Check if speechSynthesis is available
+  const isSpeechSynthesisAvailable = typeof window !== 'undefined' && 
+    'speechSynthesis' in window && 
+    window.speechSynthesis !== undefined;
+
   const cancel = useCallback(() => {
-    window.speechSynthesis.cancel();
+    if (isSpeechSynthesisAvailable && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (error) {
+        console.warn('Error canceling speech synthesis:', error);
+      }
+    }
     setState('IDLE');
     setCurrentText(null);
-  }, []);
+  }, [isSpeechSynthesisAvailable]);
 
   const cleanTextForTTS = (text: string, lang: Language | undefined) => {
     // Standardize cleanup logic
@@ -38,12 +49,25 @@ export const useTTS = () => {
   };
 
   const speak = useCallback((text: string, lang: Language | undefined, onComplete?: () => void) => {
+    // Check if speechSynthesis is available
+    if (!isSpeechSynthesisAvailable || !window.speechSynthesis) {
+      console.warn('Speech synthesis is not available in this environment');
+      setState('ERROR');
+      if (onComplete) onComplete();
+      return;
+    }
+
     // 1. Cancel existing
-    window.speechSynthesis.cancel();
+    try {
+      window.speechSynthesis.cancel();
+    } catch (error) {
+      console.warn('Error canceling previous speech:', error);
+    }
     
     const cleanText = cleanTextForTTS(text, lang);
     if (!cleanText) {
         setState('ERROR');
+        if (onComplete) onComplete();
         return;
     }
 
@@ -55,7 +79,12 @@ export const useTTS = () => {
     utteranceRef.current = utterance;
 
     // 3. Voice Selection Logic
-    const voices = window.speechSynthesis.getVoices();
+    let voices: SpeechSynthesisVoice[] = [];
+    try {
+      voices = window.speechSynthesis.getVoices();
+    } catch (error) {
+      console.warn('Error getting voices:', error);
+    }
     let targetLangCode = '';
     
     if (lang === Language.JAPANESE) targetLangCode = 'ja-JP';
@@ -101,10 +130,23 @@ export const useTTS = () => {
 
     // 6. Execute (Wait a tick to ensure UI shows loading state)
     setTimeout(() => {
-        window.speechSynthesis.speak(utterance);
+      try {
+        if (isSpeechSynthesisAvailable && window.speechSynthesis) {
+          window.speechSynthesis.speak(utterance);
+        } else {
+          setState('ERROR');
+          setCurrentText(null);
+          if (onComplete) onComplete();
+        }
+      } catch (error) {
+        console.error('Error speaking:', error);
+        setState('ERROR');
+        setCurrentText(null);
+        if (onComplete) onComplete();
+      }
     }, 50);
 
-  }, []);
+  }, [isSpeechSynthesisAvailable]);
 
   return { speak, cancel, state, currentText };
 };

@@ -1,11 +1,12 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { UserProfile, Course, Chapter, Language, ProcessingJob, SearchResult, UserStats, PracticeHistory } from '../types';
+import { UserProfile, Course, Chapter, Language, ProcessingJob, SearchResult, UserStats, PracticeHistory, VocabWord } from '../types';
 import { db } from '../services/storage';
 import { useNavigate } from 'react-router-dom';
-import { Book, GraduationCap, ChevronRight, Plus, Flame, Trophy, Clock, ArrowRight, BookOpen, Layers, Zap, PlayCircle, Lightbulb, Sparkles, Search, X, Loader2, Play, Pause, Trash2, AlertTriangle, RefreshCw, Globe, Wand2, Star, History } from 'lucide-react';
+import { Book, GraduationCap, ChevronRight, Plus, Flame, Trophy, Clock, ArrowRight, BookOpen, Layers, Zap, PlayCircle, Lightbulb, Sparkles, Search, X, Loader2, Play, Pause, Trash2, AlertTriangle, RefreshCw, Globe, Wand2, Star, History, Volume2 } from 'lucide-react';
 import { useProcessing } from '../context/ProcessingContext';
 import { searchWordMeaning } from '../services/gemini';
+import { useTTS } from '../hooks/useTTS';
 
 export default function Dashboard({ profile }: { profile: UserProfile | null }) {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -18,14 +19,18 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
   const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredResults, setFilteredResults] = useState<{ type: 'course'|'chapter'|'word', title: string, subtitle?: string, id: string, courseId?: string, chapterId?: string }[]>([]);
+  const [filteredResults, setFilteredResults] = useState<{ type: 'course'|'chapter'|'word', title: string, subtitle?: string, id: string, courseId?: string, chapterId?: string, vocabWord?: VocabWord }[]>([]);
   
   const [isSearchingAI, setIsSearchingAI] = useState(false);
   const [aiResult, setAiResult] = useState<SearchResult | null>(null);
+  const [isLocalWord, setIsLocalWord] = useState(false);
+  const aiSearchAbortRef = useRef<boolean>(false);
+  const isShowingLocalWordRef = useRef<boolean>(false); // Track if we're intentionally showing local word
 
   const navigate = useNavigate();
   const { resumeJob, pauseJob, deleteJob, activeJobId, state: processingState } = useProcessing();
   const prevDataRef = useRef<{courses: string, chapters: string, jobs: string, stats: string}>({courses: '', chapters: '', jobs: '', stats: ''});
+  const { speak, state: ttsState, currentText } = useTTS();
 
   // Helper to check if data actually changed
   const hasDataChanged = (newData: any, oldData: string, key: string): boolean => {
@@ -142,43 +147,139 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
   useEffect(() => {
       if (!searchQuery.trim()) {
           setFilteredResults([]);
+          // Don't clear modal if we're intentionally showing a local word
+          // Check both state and ref to handle async state updates
+          if (!isLocalWord && !isShowingLocalWordRef.current) {
+              setAiResult(null);
+              setIsLocalWord(false);
+              isShowingLocalWordRef.current = false;
+          }
           return;
       }
       
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
       const results: any[] = [];
+      const exactMatches: any[] = [];
+      const partialMatches: any[] = [];
 
       courses.forEach(course => {
-          if (course.title.toLowerCase().includes(query)) {
-              results.push({ type: 'course', title: course.title, subtitle: `${course.chapters.length} chapters`, id: course.id });
+          // Course search
+          const courseTitleLower = course.title.toLowerCase();
+          if (courseTitleLower === query) {
+              exactMatches.push({ type: 'course', title: course.title, subtitle: `${course.chapters.length} chapters`, id: course.id, priority: 1 });
+          } else if (courseTitleLower.includes(query)) {
+              partialMatches.push({ type: 'course', title: course.title, subtitle: `${course.chapters.length} chapters`, id: course.id, priority: 2 });
           }
+          
           course.chapters.forEach(chapter => {
-              if (chapter.title.toLowerCase().includes(query)) {
-                  results.push({ type: 'chapter', title: chapter.title, subtitle: course.title, id: chapter.id, courseId: course.id });
+              // Chapter search
+              const chapterTitleLower = chapter.title.toLowerCase();
+              if (chapterTitleLower === query) {
+                  exactMatches.push({ type: 'chapter', title: chapter.title, subtitle: course.title, id: chapter.id, courseId: course.id, priority: 1 });
+              } else if (chapterTitleLower.includes(query)) {
+                  partialMatches.push({ type: 'chapter', title: chapter.title, subtitle: course.title, id: chapter.id, courseId: course.id, priority: 2 });
               }
+              
+              // Word search - prioritize exact matches
               chapter.vocab.forEach(v => {
-                  if (v.original.toLowerCase().includes(query) || v.meaning.toLowerCase().includes(query)) {
-                      results.push({ type: 'word', title: v.original, subtitle: `${v.meaning} (${chapter.title})`, id: chapter.id, courseId: course.id, chapterId: chapter.id });
+                  const originalLower = v.original.toLowerCase();
+                  const meaningLower = v.meaning.toLowerCase();
+                  
+                  // Exact match on original word (highest priority)
+                  if (originalLower === query) {
+                      exactMatches.push({ 
+                          type: 'word', 
+                          title: v.original, 
+                          subtitle: `${v.meaning} (${chapter.title})`, 
+                          id: chapter.id, 
+                          courseId: course.id, 
+                          chapterId: chapter.id,
+                          vocabWord: v,
+                          priority: 1
+                      });
+                  } 
+                  // Exact match on meaning
+                  else if (meaningLower === query) {
+                      exactMatches.push({ 
+                          type: 'word', 
+                          title: v.original, 
+                          subtitle: `${v.meaning} (${chapter.title})`, 
+                          id: chapter.id, 
+                          courseId: course.id, 
+                          chapterId: chapter.id,
+                          vocabWord: v,
+                          priority: 2
+                      });
+                  }
+                  // Partial match
+                  else if (originalLower.includes(query) || meaningLower.includes(query)) {
+                      partialMatches.push({ 
+                          type: 'word', 
+                          title: v.original, 
+                          subtitle: `${v.meaning} (${chapter.title})`, 
+                          id: chapter.id, 
+                          courseId: course.id, 
+                          chapterId: chapter.id,
+                          vocabWord: v,
+                          priority: 3
+                      });
                   }
               });
           });
       });
-      setFilteredResults(results.slice(0, 10)); 
+      
+      // Combine and sort: exact matches first, then partial matches
+      const sortedResults = [...exactMatches, ...partialMatches]
+          .sort((a, b) => (a.priority || 999) - (b.priority || 999))
+          .slice(0, 10);
+      
+      setFilteredResults(sortedResults);
   }, [searchQuery, courses]);
+
+  // Convert local VocabWord to SearchResult format
+  const convertVocabToSearchResult = (vocab: VocabWord, profile: UserProfile): SearchResult => {
+      return {
+          word: vocab.original,
+          partOfSpeech: vocab.partOfSpeech || 'Unknown',
+          meaning: vocab.meaning,
+          examples: vocab.exampleSentence ? [
+              {
+                  sentence: vocab.exampleSentence,
+                  translation: vocab.meaning
+              }
+          ] : [],
+          pinyinWithTones: vocab.reading || undefined
+      };
+  };
 
   const handleAISearch = async () => {
       if (!profile || !searchQuery) return;
+      aiSearchAbortRef.current = false;
       setIsSearchingAI(true);
+      setIsLocalWord(false); // Reset local word flag
       setFilteredResults([]); 
       try {
           const result = await searchWordMeaning(searchQuery, profile.nativeLanguage, profile.targetLanguage, profile);
-          setAiResult(result);
+          if (!aiSearchAbortRef.current) {
+              setAiResult(result);
+              setIsLocalWord(false); // AI result, not local
+          }
       } catch (e) {
-          console.error(e);
-          alert("Could not fetch meaning. Please try again.");
+          if (!aiSearchAbortRef.current) {
+              console.error(e);
+              alert("Could not fetch meaning. Please try again.");
+          }
       } finally {
-          setIsSearchingAI(false);
+          if (!aiSearchAbortRef.current) {
+              setIsSearchingAI(false);
+          }
       }
+  };
+
+  const cancelAISearch = () => {
+      aiSearchAbortRef.current = true;
+      setIsSearchingAI(false);
+      setSearchQuery('');
   };
 
   const getGreeting = () => {
@@ -192,10 +293,39 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       navigate(`/course/${courseId}`, { state: { activeChapterId: chapterId, autoStartStudy: true } });
   }
 
-  const handleResultClick = (result: any) => {
-      if (result.type === 'course') navigate(`/course/${result.id}`);
-      else if (result.type === 'chapter') navigate(`/course/${result.courseId}`, { state: { activeChapterId: result.id } });
-      else if (result.type === 'word') navigate(`/course/${result.courseId}`, { state: { activeChapterId: result.chapterId } });
+  const handleResultClick = (result: any, e?: React.MouseEvent) => {
+      if (e) {
+          e.stopPropagation();
+          e.preventDefault();
+      }
+      
+      if (result.type === 'course') {
+          navigate(`/course/${result.id}`);
+      } else if (result.type === 'chapter') {
+          navigate(`/course/${result.courseId}`, { state: { activeChapterId: result.id } });
+      } else if (result.type === 'word') {
+          // If word exists locally, show it in modal instead of navigating
+          if (result.vocabWord && profile) {
+              const searchResult = convertVocabToSearchResult(result.vocabWord, profile);
+              // Set ref FIRST to prevent useEffect from clearing modal
+              isShowingLocalWordRef.current = true;
+              // Set local word flag
+              setIsLocalWord(true);
+              // Set the result to show in modal
+              setAiResult(searchResult);
+              // Clear search query after a delay to ensure modal renders
+              setTimeout(() => {
+                  setSearchQuery(''); // Clear search to close dropdown
+                  // Reset ref after modal is shown
+                  setTimeout(() => {
+                      isShowingLocalWordRef.current = false;
+                  }, 100);
+              }, 200);
+          } else {
+              // Fallback to navigation if vocab word not available
+              navigate(`/course/${result.courseId}`, { state: { activeChapterId: result.chapterId } });
+          }
+      }
   };
 
   const handleDeleteCourse = async (course: Course, e: React.MouseEvent) => {
@@ -230,15 +360,41 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
       
       {/* AI Search Modal */}
       {aiResult && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setAiResult(null)}>
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4" onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }}>
               <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-300 relative border border-white/20" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setAiResult(null)} className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
+                  <button onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }} className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
                   
                   <div className="text-center mb-8 mt-2">
-                      <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold mb-3 uppercase tracking-wider border border-indigo-100 dark:border-indigo-800">
-                        {aiResult.partOfSpeech}
-                      </span>
-                      <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-2 tracking-tight">{aiResult.word}</h2>
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                          <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider border border-indigo-100 dark:border-indigo-800">
+                            {profile?.targetLanguage || 'Language'}
+                          </span>
+                          {isLocalWord && (
+                              <span className="inline-block px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">
+                                Local
+                              </span>
+                          )}
+                      </div>
+                      <div className="flex items-center justify-center gap-3 mb-2">
+                        <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{aiResult.word}</h2>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (profile?.targetLanguage) {
+                              speak(aiResult.word, profile.targetLanguage as Language);
+                            }
+                          }}
+                          disabled={(currentText === aiResult.word && (ttsState === 'PLAYING' || ttsState === 'LOADING')) || (!currentText && (ttsState === 'PLAYING' || ttsState === 'LOADING'))}
+                          className="p-2.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                          title="Play pronunciation"
+                        >
+                          {currentText === aiResult.word && (ttsState === 'PLAYING' || ttsState === 'LOADING') ? (
+                            <Loader2 size={20} className="animate-spin" />
+                          ) : (
+                            <Volume2 size={20} />
+                          )}
+                        </button>
+                      </div>
                       {aiResult.pinyinWithTones && <p className="text-lg text-indigo-500 font-medium font-serif">{aiResult.pinyinWithTones}</p>}
                   </div>
 
@@ -258,12 +414,37 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                       <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Context Examples</p>
                           <div className="space-y-3">
-                            {aiResult.examples.map((ex, i) => (
+                            {aiResult.examples.map((ex, i) => {
+                              const isPlaying = currentText === ex.sentence && (ttsState === 'PLAYING' || ttsState === 'LOADING');
+                              // Only disable if a DIFFERENT sentence is currently playing
+                              const isDisabled = currentText !== null && currentText !== ex.sentence && (ttsState === 'PLAYING' || ttsState === 'LOADING');
+                              return (
                                 <div key={i} className="text-sm">
-                                    <p className="text-indigo-600 dark:text-indigo-400 font-semibold mb-1">{ex.sentence}</p>
+                                    <div className="flex items-start gap-2 mb-1">
+                                        <p className="flex-1 text-indigo-600 dark:text-indigo-400 font-semibold">{ex.sentence}</p>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            if (profile?.targetLanguage) {
+                                              speak(ex.sentence, profile.targetLanguage as Language);
+                                            }
+                                          }}
+                                          disabled={isDisabled}
+                                          className="p-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                          title="Play sentence"
+                                        >
+                                          {isPlaying ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                          ) : (
+                                            <Volume2 size={14} />
+                                          )}
+                                        </button>
+                                    </div>
                                     <p className="text-slate-500 dark:text-slate-400 italic">{ex.translation}</p>
                                 </div>
-                            ))}
+                              );
+                            })}
                           </div>
                       </div>
                   </div>
@@ -329,7 +510,15 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                     onKeyDown={(e) => e.key === 'Enter' && handleAISearch()}
                 />
                 {searchQuery ? (
-                    <button onClick={() => setSearchQuery('')} className="p-2 text-slate-400 hover:text-slate-600"><X size={18} /></button>
+                    <button 
+                        onClick={() => {
+                            setSearchQuery('');
+                            isShowingLocalWordRef.current = false;
+                        }} 
+                        className="p-2 text-slate-400 hover:text-slate-600"
+                    >
+                        <X size={18} />
+                    </button>
                 ) : (
                     <button className="p-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-slate-400"><Wand2 size={18} /></button>
                 )}
@@ -339,9 +528,16 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
             {(searchQuery || isSearchingAI) && !aiResult && (
                 <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                     {isSearchingAI ? (
-                        <div className="p-8 flex flex-col items-center justify-center gap-3 text-center">
+                        <div className="p-8 flex flex-col items-center justify-center gap-4 text-center relative">
                             <Loader2 className="animate-spin text-indigo-600" size={32} />
                             <p className="text-slate-800 dark:text-white font-bold">Consulting AI Tutor...</p>
+                            <button
+                                onClick={cancelAISearch}
+                                className="mt-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm font-semibold flex items-center gap-2"
+                            >
+                                <X size={16} />
+                                Cancel
+                            </button>
                         </div>
                     ) : (
                         <>
@@ -362,7 +558,7 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                                 {filteredResults.map((result, idx) => (
                                     <div 
                                         key={idx} 
-                                        onClick={() => handleResultClick(result)}
+                                        onClick={(e) => handleResultClick(result, e)}
                                         className="p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer flex items-center justify-between group transition-colors"
                                     >
                                         <div className="flex items-center gap-3">

@@ -129,17 +129,37 @@ Question: ${userMessage.content}`
 
       const response = await model;
       let text = '';
-      if (response.response) {
-        const candidates = response.response.candidates;
-        if (candidates && candidates.length > 0) {
-          const content = candidates[0].content;
-          if (content && content.parts) {
-            text = content.parts.map((p: any) => p.text || '').join('');
+      
+      // Handle different response structures
+      if (response && typeof response === 'object') {
+        // Try response.text first (direct property)
+        if (response.text) {
+          text = response.text;
+        }
+        // Try response.response.candidates (nested structure)
+        else if ((response as any).response?.candidates) {
+          const candidates = (response as any).response.candidates;
+          if (candidates && candidates.length > 0) {
+            const content = candidates[0].content;
+            if (content && content.parts) {
+              text = content.parts.map((p: any) => p.text || '').join('');
+            }
+          }
+        }
+        // Try candidates directly
+        else if ((response as any).candidates) {
+          const candidates = (response as any).candidates;
+          if (candidates && candidates.length > 0) {
+            const content = candidates[0].content;
+            if (content && content.parts) {
+              text = content.parts.map((p: any) => p.text || '').join('');
+            }
           }
         }
       }
+      
       if (!text) {
-        text = response.text || 'Sorry, I could not generate a response.';
+        text = 'Sorry, I could not generate a response. Please try again.';
       }
       
       const assistantMessage: ChatMessage = {
@@ -240,17 +260,37 @@ Make it thorough but well-organized.`
 
       const response = await model;
       let expandedText = '';
-      if (response.response) {
-        const candidates = response.response.candidates;
-        if (candidates && candidates.length > 0) {
-          const content = candidates[0].content;
-          if (content && content.parts) {
-            expandedText = content.parts.map((p: any) => p.text || '').join('');
+      
+      // Handle different response structures
+      if (response && typeof response === 'object') {
+        // Try response.text first (direct property)
+        if (response.text) {
+          expandedText = response.text;
+        }
+        // Try response.response.candidates (nested structure)
+        else if ((response as any).response?.candidates) {
+          const candidates = (response as any).response.candidates;
+          if (candidates && candidates.length > 0) {
+            const content = candidates[0].content;
+            if (content && content.parts) {
+              expandedText = content.parts.map((p: any) => p.text || '').join('');
+            }
+          }
+        }
+        // Try candidates directly
+        else if ((response as any).candidates) {
+          const candidates = (response as any).candidates;
+          if (candidates && candidates.length > 0) {
+            const content = candidates[0].content;
+            if (content && content.parts) {
+              expandedText = content.parts.map((p: any) => p.text || '').join('');
+            }
           }
         }
       }
+      
       if (!expandedText) {
-        expandedText = response.text || 'Could not generate expanded explanation.';
+        expandedText = 'Could not generate expanded explanation. Please try again.';
       }
 
       setMessages(prev => prev.map(msg => 

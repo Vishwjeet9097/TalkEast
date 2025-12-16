@@ -391,6 +391,12 @@ export default function PracticeHub({ profile }: Props) {
             await db.saveStats(updatedStats);
             setStats(updatedStats);
             setSessionCompleted(true);
+            
+            // Stop hourly reminders if daily review is completed
+            if (isDailyReview && updatedStats.dailyReviewCompleted) {
+                const { NotificationService } = await import('../services/notifications');
+                NotificationService.stopHourlyReminders();
+            }
         }
     };
 

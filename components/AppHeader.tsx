@@ -43,7 +43,7 @@ export default function AppHeader({ profile, onUpdateProfile }: AppHeaderProps) 
   const supportedLanguages = [Language.JAPANESE, Language.KOREAN, Language.CHINESE];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-30 glass-panel border-b border-white/60 dark:border-slate-800/50 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
+    <header className="fixed left-0 right-0 z-30 glass-panel border-b border-white/60 dark:border-slate-800/50 backdrop-blur-xl" style={{ top: '10px', paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="max-w-md mx-auto md:max-w-5xl px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <button
