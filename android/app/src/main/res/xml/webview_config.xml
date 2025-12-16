@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<webviewconfig>
+    <!-- Enable JavaScript -->
+    <javascript enabled="true" />
+    <!-- Enable DOM Storage -->
+    <domStorage enabled="true" />
+    <!-- Enable Database -->
+    <database enabled="true" />
+    <!-- Allow file access -->
+    <allowFileAccess enabled="true" />
+    <allowContentAccess enabled="true" />
+    <allowFileAccessFromFileURLs enabled="true" />
+    <allowUniversalAccessFromFileURLs enabled="true" />
+    <!-- Media playback -->
+    <mediaPlaybackRequiresUserGesture enabled="false" />
+    <!-- Mixed content -->
+    <mixedContentMode value="always" />
+</webviewconfig>
+

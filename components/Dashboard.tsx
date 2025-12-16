@@ -358,94 +358,126 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
   return (
     <div className="space-y-10 pb-12">
       
-      {/* AI Search Modal */}
+      {/* AI Search Modal - Fully Scrollable */}
       {aiResult && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4" onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }}>
-              <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-300 relative border border-white/20" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }} className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 transition-colors"><X size={20} /></button>
+          <div 
+              className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center" 
+              style={{
+                  paddingTop: `max(1rem, env(safe-area-inset-top))`,
+                  paddingBottom: `max(1rem, env(safe-area-inset-bottom))`,
+                  paddingLeft: '1rem',
+                  paddingRight: '1rem'
+              }}
+              onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }}
+          >
+              <div 
+                  className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-300 relative border border-white/20 overflow-hidden flex flex-col" 
+                  style={{
+                      maxHeight: `calc(100vh - max(2rem, env(safe-area-inset-top) + 1rem) - max(2rem, env(safe-area-inset-bottom) + 1rem))`,
+                      height: 'auto'
+                  }}
+                  onClick={e => e.stopPropagation()}
+              >
+                  {/* Close Button - Fixed Position */}
+                  <button 
+                      onClick={() => { setAiResult(null); setIsLocalWord(false); isShowingLocalWordRef.current = false; }} 
+                      className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors z-20 shadow-lg"
+                  >
+                      <X size={20} />
+                  </button>
                   
-                  <div className="text-center mb-8 mt-2">
-                      <div className="flex items-center justify-center gap-2 mb-3">
-                          <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider border border-indigo-100 dark:border-indigo-800">
-                            {profile?.targetLanguage || 'Language'}
-                          </span>
-                          {isLocalWord && (
-                              <span className="inline-block px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">
-                                Local
-                              </span>
-                          )}
-                      </div>
-                      <div className="flex items-center justify-center gap-3 mb-2">
-                        <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{aiResult.word}</h2>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (profile?.targetLanguage) {
-                              speak(aiResult.word, profile.targetLanguage as Language);
-                            }
-                          }}
-                          disabled={(currentText === aiResult.word && (ttsState === 'PLAYING' || ttsState === 'LOADING')) || (!currentText && (ttsState === 'PLAYING' || ttsState === 'LOADING'))}
-                          className="p-2.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-                          title="Play pronunciation"
-                        >
-                          {currentText === aiResult.word && (ttsState === 'PLAYING' || ttsState === 'LOADING') ? (
-                            <Loader2 size={20} className="animate-spin" />
-                          ) : (
-                            <Volume2 size={20} />
-                          )}
-                        </button>
-                      </div>
-                      {aiResult.pinyinWithTones && <p className="text-lg text-indigo-500 font-medium font-serif">{aiResult.pinyinWithTones}</p>}
-                  </div>
-
-                  <div className="space-y-4">
-                      <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-800/50 p-5 rounded-2xl border border-indigo-100 dark:border-slate-700">
-                          <p className="text-[10px] text-indigo-400 mb-1 uppercase font-bold tracking-wider">{profile?.nativeLanguage}</p>
-                          <p className="font-bold text-xl text-slate-800 dark:text-white leading-snug">{aiResult.meaning}</p>
-                      </div>
-
-                      {aiResult.englishMeaning && (
-                          <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
-                              <p className="text-[10px] text-slate-400 mb-1 uppercase font-bold tracking-wider">English</p>
-                              <p className="font-medium text-slate-700 dark:text-slate-200">{aiResult.englishMeaning}</p>
+                  {/* Fully Scrollable Content */}
+                  <div className="overflow-y-auto custom-scrollbar flex-1 min-h-0">
+                      <div className="p-6 space-y-6 pb-8">
+                          {/* Header Section */}
+                          <div className="text-center pt-2">
+                              <div className="flex items-center justify-center gap-2 mb-4">
+                                  <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider border border-indigo-100 dark:border-indigo-800">
+                                    {profile?.targetLanguage || 'Language'}
+                                  </span>
+                                  {isLocalWord && (
+                                      <span className="inline-block px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider border border-green-100 dark:border-green-800">
+                                        Local
+                                      </span>
+                                  )}
+                              </div>
+                              <div className="flex items-center justify-center gap-3 mb-3">
+                                <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{aiResult.word}</h2>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (profile?.targetLanguage) {
+                                      speak(aiResult.word, profile.targetLanguage as Language);
+                                    }
+                                  }}
+                                  disabled={(currentText === aiResult.word && (ttsState === 'PLAYING' || ttsState === 'LOADING')) || (!currentText && (ttsState === 'PLAYING' || ttsState === 'LOADING'))}
+                                  className="p-2.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/60 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                                  title="Play pronunciation"
+                                >
+                                  {currentText === aiResult.word && (ttsState === 'PLAYING' || ttsState === 'LOADING') ? (
+                                    <Loader2 size={20} className="animate-spin" />
+                                  ) : (
+                                    <Volume2 size={20} />
+                                  )}
+                                </button>
+                              </div>
+                              {aiResult.pinyinWithTones && (
+                                  <p className="text-lg text-indigo-500 font-medium font-serif">{aiResult.pinyinWithTones}</p>
+                              )}
                           </div>
-                      )}
 
-                      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Context Examples</p>
-                          <div className="space-y-3">
-                            {aiResult.examples.map((ex, i) => {
-                              const isPlaying = currentText === ex.sentence && (ttsState === 'PLAYING' || ttsState === 'LOADING');
-                              // Only disable if a DIFFERENT sentence is currently playing
-                              const isDisabled = currentText !== null && currentText !== ex.sentence && (ttsState === 'PLAYING' || ttsState === 'LOADING');
-                              return (
-                                <div key={i} className="text-sm">
-                                    <div className="flex items-start gap-2 mb-1">
-                                        <p className="flex-1 text-indigo-600 dark:text-indigo-400 font-semibold">{ex.sentence}</p>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                            if (profile?.targetLanguage) {
-                                              speak(ex.sentence, profile.targetLanguage as Language);
-                                            }
-                                          }}
-                                          disabled={isDisabled}
-                                          className="p-1.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                                          title="Play sentence"
-                                        >
-                                          {isPlaying ? (
-                                            <Loader2 size={14} className="animate-spin" />
-                                          ) : (
-                                            <Volume2 size={14} />
-                                          )}
-                                        </button>
-                                    </div>
-                                    <p className="text-slate-500 dark:text-slate-400 italic">{ex.translation}</p>
-                                </div>
-                              );
-                            })}
+                          {/* Meaning Section */}
+                          <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-800/50 p-5 rounded-2xl border border-indigo-100 dark:border-slate-700">
+                              <p className="text-[10px] text-indigo-400 mb-2 uppercase font-bold tracking-wider">{profile?.nativeLanguage}</p>
+                              <p className="font-bold text-xl text-slate-800 dark:text-white leading-snug">{aiResult.meaning}</p>
                           </div>
+
+                          {/* English Meaning (if available) */}
+                          {aiResult.englishMeaning && (
+                              <div className="bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                                  <p className="text-[10px] text-slate-400 mb-2 uppercase font-bold tracking-wider">English</p>
+                                  <p className="font-medium text-slate-700 dark:text-slate-200 leading-relaxed">{aiResult.englishMeaning}</p>
+                              </div>
+                          )}
+
+                          {/* Context Examples - Max 2 */}
+                          {aiResult.examples && aiResult.examples.length > 0 && (
+                              <div className="pt-2">
+                                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Context Examples</p>
+                                  <div className="space-y-4">
+                                    {aiResult.examples.slice(0, 2).map((ex, i) => {
+                                      const isPlaying = currentText === ex.sentence && (ttsState === 'PLAYING' || ttsState === 'LOADING');
+                                      const isDisabled = currentText !== null && currentText !== ex.sentence && (ttsState === 'PLAYING' || ttsState === 'LOADING');
+                                      return (
+                                        <div key={i} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                            <div className="flex items-start gap-3 mb-2">
+                                                <p className="flex-1 text-indigo-600 dark:text-indigo-400 font-semibold text-base leading-relaxed">{ex.sentence}</p>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    if (profile?.targetLanguage) {
+                                                      speak(ex.sentence, profile.targetLanguage as Language);
+                                                    }
+                                                  }}
+                                                  disabled={isDisabled}
+                                                  className="p-2 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 shadow-sm"
+                                                  title="Play sentence"
+                                                >
+                                                  {isPlaying ? (
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                  ) : (
+                                                    <Volume2 size={16} />
+                                                  )}
+                                                </button>
+                                            </div>
+                                            <p className="text-slate-600 dark:text-slate-300 italic text-sm leading-relaxed">{ex.translation}</p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                              </div>
+                          )}
                       </div>
                   </div>
               </div>
@@ -542,7 +574,11 @@ export default function Dashboard({ profile }: { profile: UserProfile | null }) 
                     ) : (
                         <>
                            <div 
-                                onClick={() => navigate('/ask-ai', { state: { query: searchQuery } })}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    handleAISearch();
+                                }}
                                 className="p-4 m-2 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 cursor-pointer flex items-center gap-4 group transition-colors"
                             >
                                 <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">

@@ -4,9 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.talkeast.lingoflow',
   appName: 'TalkEast',
   webDir: 'dist',
-  server: {
-    androidScheme: 'https'
-  },
+  // No server config = load from bundled assets (file:///android_asset/public/index.html)
   android: {
     buildOptions: {
       keystorePath: undefined,
