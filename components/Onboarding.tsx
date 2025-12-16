@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserProfile, Language } from '../types';
 import { ArrowRight, Check, Globe, Play, Sparkles, Languages, BookOpen, Mic, BrainCircuit } from 'lucide-react';
-import onboardImage from '../assets/onboard.png';
 
 interface Props {
   onComplete: (profile: UserProfile) => Promise<void> | void;
@@ -15,6 +14,472 @@ const LANGUAGE_CONFIG: Record<Language, { emoji: string; nativeName: string; des
   [Language.JAPANESE]: { emoji: '🇯🇵', nativeName: '日本語', description: 'Rich culture & tradition' },
   [Language.KOREAN]: { emoji: '🇰🇷', nativeName: '한국어', description: 'K-pop & modern culture' },
   [Language.CHINESE]: { emoji: '🇨🇳', nativeName: '中文', description: 'Ancient wisdom & business' },
+};
+
+// Speech Bubbles Illustration - Reference Style
+const SpeechBubblesIllustration = () => {
+  const [isDark, setIsDark] = useState(() => 
+    document.documentElement.classList.contains('dark')
+  );
+  
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+  
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      <svg 
+        viewBox="0 0 400 300" 
+        className="w-full h-full max-w-md"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          {/* Gradients matching theme */}
+          <linearGradient id="bubbleGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="100%" stopColor="#4f46e5" />
+          </linearGradient>
+          
+          <linearGradient id="bubbleGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#f97316" />
+          </linearGradient>
+          
+          {/* Animation styles */}
+          <style>{`
+            @keyframes float {
+              0%, 100% { transform: translateY(0px); }
+              50% { transform: translateY(-10px); }
+            }
+            .float-animation {
+              animation: float 3s ease-in-out infinite;
+            }
+            .float-animation-delay {
+              animation: float 3s ease-in-out infinite;
+              animation-delay: 1.5s;
+            }
+          `}</style>
+        </defs>
+        
+        {/* Decorative Elements - Left side (Indigo theme) */}
+        <g opacity={isDark ? 0.4 : 0.6}>
+          {/* Circles */}
+          <circle cx="70" cy="50" r="8" fill="#6366f1" />
+          <circle cx="50" cy="90" r="6" fill="#9333ea" />
+          <circle cx="90" cy="110" r="7" fill="#6366f1" />
+          <circle cx="40" cy="130" r="5" fill="#9333ea" />
+          
+          {/* X marks */}
+          <g transform="translate(65, 75)">
+            <line x1="-4" y1="-4" x2="4" y2="4" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="4" y1="-4" x2="-4" y2="4" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+          <g transform="translate(80, 140)">
+            <line x1="-3" y1="-3" x2="3" y2="3" stroke="#9333ea" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="3" y1="-3" x2="-3" y2="3" stroke="#9333ea" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        </g>
+        
+        {/* Left Speech Bubble - Indigo */}
+        <g className="float-animation" transform="translate(0, 0)">
+          <rect 
+            x="100" 
+            y="80" 
+            width="110" 
+            height="110" 
+            rx="24" 
+            fill="url(#bubbleGradient1)"
+            style={{ 
+              filter: 'drop-shadow(0 10px 20px rgba(99, 102, 241, 0.35))',
+            }}
+          />
+          <text 
+            x="155" 
+            y="150" 
+            textAnchor="middle" 
+            fontSize="80" 
+            fill="white"
+            fontWeight="bold"
+            fontFamily="system-ui, -apple-system, sans-serif"
+            style={{ textRendering: 'optimizeLegibility' }}
+          >
+            A
+          </text>
+        </g>
+        
+        {/* Decorative Elements - Right side (Orange theme) */}
+        <g opacity={isDark ? 0.4 : 0.6}>
+          {/* Circles */}
+          <circle cx="310" cy="50" r="8" fill="#f59e0b" />
+          <circle cx="330" cy="90" r="6" fill="#f97316" />
+          <circle cx="290" cy="110" r="7" fill="#f59e0b" />
+          <circle cx="340" cy="130" r="5" fill="#f97316" />
+          
+          {/* X marks */}
+          <g transform="translate(305, 75)">
+            <line x1="-4" y1="-4" x2="4" y2="4" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="4" y1="-4" x2="-4" y2="4" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+          <g transform="translate(320, 140)">
+            <line x1="-3" y1="-3" x2="3" y2="3" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+            <line x1="3" y1="-3" x2="-3" y2="3" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        </g>
+        
+        {/* Right Speech Bubble - Orange */}
+        <g className="float-animation-delay" transform="translate(0, 0)">
+          <rect 
+            x="190" 
+            y="80" 
+            width="110" 
+            height="110" 
+            rx="24" 
+            fill="url(#bubbleGradient2)"
+            style={{ 
+              filter: 'drop-shadow(0 10px 20px rgba(245, 158, 11, 0.35))',
+            }}
+          />
+          <text 
+            x="245" 
+            y="150" 
+            textAnchor="middle" 
+            fontSize="70" 
+            fill="white"
+            fontWeight="bold"
+            fontFamily="system-ui, -apple-system, sans-serif"
+            style={{ textRendering: 'optimizeLegibility' }}
+          >
+            文
+          </text>
+        </g>
+      </svg>
+    </div>
+  );
+};
+
+// Professional Language Learning SVG Illustration Component
+const LanguageLearningIllustration = () => {
+  // Detect dark mode with state to track changes
+  const [isDark, setIsDark] = useState(() => 
+    document.documentElement.classList.contains('dark')
+  );
+  
+  React.useEffect(() => {
+    // Watch for theme changes
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    
+    return () => observer.disconnect();
+  }, []);
+  
+  return (
+    <svg 
+      viewBox="0 0 360 320" 
+      className="w-full h-full object-contain"
+      style={{ maxHeight: '100%' }}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        {/* Gradient definitions matching app theme */}
+        <linearGradient id="globeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.9" />
+          <stop offset="50%" stopColor="#9333ea" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.7" />
+        </linearGradient>
+        
+        <linearGradient id="bubbleGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#9333ea" stopOpacity="0.25" />
+        </linearGradient>
+        
+        <linearGradient id="bubbleGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#9333ea" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#ec4899" stopOpacity="0.25" />
+        </linearGradient>
+        
+        <linearGradient id="bubbleGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ec4899" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.25" />
+        </linearGradient>
+        
+        <radialGradient id="glowGradient" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+        </radialGradient>
+        
+        {/* Animation for floating elements */}
+        <style>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+          .float-animation {
+            animation: float 3s ease-in-out infinite;
+          }
+          .float-animation-delay {
+            animation: float 3s ease-in-out infinite;
+            animation-delay: 1s;
+          }
+          .pulse-animation {
+            animation: pulse 2s ease-in-out infinite;
+          }
+        `}</style>
+      </defs>
+      
+      {/* Background glow effect - Subtle */}
+      <circle cx="180" cy="160" r="120" fill="url(#glowGradient)" className="pulse-animation" opacity={isDark ? 0.4 : 0.3} />
+      
+      {/* Central Globe - Main focal point - Simplified */}
+      <g className="float-animation" transform="translate(180, 160)">
+        {/* Globe base circle */}
+        <circle 
+          cx="0" 
+          cy="0" 
+          r="70" 
+          fill="url(#globeGradient)" 
+          opacity={isDark ? 0.95 : 1}
+          style={{ filter: 'drop-shadow(0 8px 24px rgba(99, 102, 241, 0.25))' }}
+        />
+        
+        {/* Simplified Globe grid lines (longitude) */}
+        {[0, 2, 4].map((i) => {
+          return (
+            <ellipse
+              key={`long-${i}`}
+              cx="0"
+              cy="0"
+              rx="70"
+              ry="35"
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.35)"
+              strokeWidth="1.5"
+              transform={`rotate(${i * 60})`}
+            />
+          );
+        })}
+        
+        {/* Simplified Globe grid lines (latitude) */}
+        {[-45, 0, 45].map((lat) => {
+          const radius = 70 * Math.cos((lat * Math.PI) / 180);
+          const y = 70 * Math.sin((lat * Math.PI) / 180);
+          return (
+            <line
+              key={`lat-${lat}`}
+              x1={-radius}
+              y1={y}
+              x2={radius}
+              y2={y}
+              stroke="rgba(255, 255, 255, 0.35)"
+              strokeWidth="1.5"
+            />
+          );
+        })}
+        
+        {/* Globe highlight */}
+        <ellipse
+          cx="-18"
+          cy="-18"
+          rx="25"
+          ry="18"
+          fill="rgba(255, 255, 255, 0.25)"
+        />
+      </g>
+      
+      {/* Speech bubbles with language symbols - Cleaner and better positioned */}
+      
+      {/* Top-left bubble - Japanese */}
+      <g className="float-animation-delay" transform="translate(70, 65)">
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="42" 
+          ry="32" 
+          fill="url(#bubbleGradient1)"
+          opacity={isDark ? 0.85 : 1}
+          style={{ filter: 'drop-shadow(0 4px 12px rgba(99, 102, 241, 0.2))' }}
+        />
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="38" 
+          ry="28" 
+          fill={isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+        />
+        <text 
+          x="0" 
+          y="6" 
+          textAnchor="middle" 
+          fontSize="26" 
+          fill={isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b'}
+          fontWeight="500"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          style={{ textRendering: 'optimizeLegibility' }}
+        >
+          日本語
+        </text>
+        {/* Speech bubble tail */}
+        <path 
+          d="M 12 22 Q 20 26 16 30 L 8 26 Z" 
+          fill="url(#bubbleGradient1)"
+          opacity={isDark ? 0.85 : 1}
+        />
+      </g>
+      
+      {/* Top-right bubble - Korean */}
+      <g className="float-animation" transform="translate(290, 75)">
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="42" 
+          ry="32" 
+          fill="url(#bubbleGradient2)"
+          opacity={isDark ? 0.85 : 1}
+          style={{ filter: 'drop-shadow(0 4px 12px rgba(147, 51, 234, 0.2))' }}
+        />
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="38" 
+          ry="28" 
+          fill={isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+        />
+        <text 
+          x="0" 
+          y="6" 
+          textAnchor="middle" 
+          fontSize="22" 
+          fill={isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b'}
+          fontWeight="500"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          style={{ textRendering: 'optimizeLegibility' }}
+        >
+          한국어
+        </text>
+        {/* Speech bubble tail */}
+        <path 
+          d="M -12 22 Q -20 26 -16 30 L -8 26 Z" 
+          fill="url(#bubbleGradient2)"
+          opacity={isDark ? 0.85 : 1}
+        />
+      </g>
+      
+      {/* Bottom-left bubble - Chinese */}
+      <g className="float-animation-delay" transform="translate(65, 255)">
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="42" 
+          ry="32" 
+          fill="url(#bubbleGradient3)"
+          opacity={isDark ? 0.85 : 1}
+          style={{ filter: 'drop-shadow(0 4px 12px rgba(236, 72, 153, 0.2))' }}
+        />
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="38" 
+          ry="28" 
+          fill={isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+        />
+        <text 
+          x="0" 
+          y="6" 
+          textAnchor="middle" 
+          fontSize="24" 
+          fill={isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b'}
+          fontWeight="500"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          style={{ textRendering: 'optimizeLegibility' }}
+        >
+          中文
+        </text>
+        {/* Speech bubble tail */}
+        <path 
+          d="M 12 22 Q 20 26 16 30 L 8 26 Z" 
+          fill="url(#bubbleGradient3)"
+          opacity={isDark ? 0.85 : 1}
+        />
+      </g>
+      
+      {/* Bottom-right bubble - Hindi */}
+      <g className="float-animation" transform="translate(295, 245)">
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="42" 
+          ry="32" 
+          fill="url(#bubbleGradient1)"
+          opacity={isDark ? 0.85 : 1}
+          style={{ filter: 'drop-shadow(0 4px 12px rgba(99, 102, 241, 0.2))' }}
+        />
+        <ellipse 
+          cx="0" 
+          cy="0" 
+          rx="38" 
+          ry="28" 
+          fill={isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)'}
+        />
+        <text 
+          x="0" 
+          y="6" 
+          textAnchor="middle" 
+          fontSize="22" 
+          fill={isDark ? 'rgba(255, 255, 255, 0.95)' : '#1e293b'}
+          fontWeight="500"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          style={{ textRendering: 'optimizeLegibility' }}
+        >
+          हिन्दी
+        </text>
+        {/* Speech bubble tail */}
+        <path 
+          d="M -12 22 Q -20 26 -16 30 L -8 26 Z" 
+          fill="url(#bubbleGradient1)"
+          opacity={isDark ? 0.85 : 1}
+        />
+      </g>
+      
+      {/* Subtle connection lines from bubbles to globe */}
+      <g opacity={isDark ? 0.25 : 0.15} strokeWidth="1.5">
+        <line x1="112" y1="97" x2="130" y2="135" stroke="#6366f1" strokeDasharray="3,3" />
+        <line x1="248" y1="107" x2="230" y2="135" stroke="#9333ea" strokeDasharray="3,3" />
+        <line x1="107" y1="223" x2="130" y2="195" stroke="#ec4899" strokeDasharray="3,3" />
+        <line x1="253" y1="213" x2="230" y2="195" stroke="#6366f1" strokeDasharray="3,3" />
+      </g>
+      
+      {/* Decorative stars/sparkles - Reduced and better positioned */}
+      {[
+        { x: 45, y: 45, delay: '0s' },
+        { x: 315, y: 50, delay: '0.6s' },
+        { x: 50, y: 275, delay: '1.2s' },
+        { x: 310, y: 270, delay: '0.3s' }
+      ].map((star, i) => (
+        <g key={`star-${i}`} opacity={isDark ? 0.7 : 0.5} className="pulse-animation" style={{ animationDelay: star.delay }}>
+          <circle cx={star.x} cy={star.y} r="2.5" fill="#6366f1" />
+          <circle cx={star.x} cy={star.y} r="1.2" fill={isDark ? '#e0e7ff' : '#ffffff'} />
+        </g>
+      ))}
+    </svg>
+  );
 };
 
 export default function Onboarding({ onComplete }: Props) {
@@ -34,112 +499,128 @@ export default function Onboarding({ onComplete }: Props) {
     navigate('/dashboard', { replace: true });
   };
 
-  // Welcome Page (Step 0)
+  // Welcome Page (Step 0) - Enhanced Design
   if (step === 0) {
     return (
-      <div className="fixed inset-0 h-screen w-screen flex flex-col relative overflow-hidden bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-950/20" style={{ minHeight: '100vh', height: '100vh' }}>
-        {/* Animated Background Elements */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl"></div>
+      <div className="fixed inset-0 h-screen w-screen flex flex-col relative overflow-hidden bg-white dark:bg-slate-900" style={{ minHeight: '100vh', height: '100vh' }}>
+        {/* Subtle Background Pattern */}
+        <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-indigo-500 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-40 h-40 bg-purple-500 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative z-10 w-full h-full flex flex-col px-6 py-6 md:py-8 overflow-hidden">
-          {/* Top Section - Title (Full Width) - Enhanced */}
-          <div className="flex-shrink-0 mb-4 md:mb-6 w-full relative">
-            {/* Decorative Background Glow */}
-            <div className="absolute -left-4 -top-4 w-32 h-32 bg-gradient-to-br from-indigo-400/20 via-purple-400/20 to-pink-400/20 rounded-full blur-2xl animate-pulse"></div>
-            
-            <h1 className="relative z-10 text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold leading-[1.1] tracking-tight w-full">
-              {/* Line 1 - Animated - Full Width */}
-              <span 
-                className="block text-slate-900 dark:text-white mb-1 md:mb-2 fade-in slide-in-from-left-4 w-full"
-                style={{ animationDelay: '0.1s' }}
-              >
-                Make every day
-              </span>
-              
-              {/* Line 2 - Animated - Full Width */}
-              <span 
-                className="block text-slate-800 dark:text-slate-100 mb-2 md:mb-3 fade-in slide-in-from-left-4 w-full"
-                style={{ animationDelay: '0.3s' }}
-              >
-                a learning
-              </span>
-              
-              {/* Line 3 - Gradient with Animation - Full Width */}
-              <span 
-                className="block relative w-full fade-in slide-in-from-left-4"
-                style={{ animationDelay: '0.5s' }}
-              >
-                <span className="gradient-text-animated relative inline-block">
-                  journey
-                </span>
-                {/* Gradient Underline Effect */}
-                <span className="absolute bottom-0 left-0 w-full h-1.5 md:h-2 gradient-underline rounded-full opacity-30 blur-sm"></span>
-              </span>
-            </h1>
-            
-            {/* Subtle Shadow for Depth */}
-            <div className="absolute inset-0 -z-10 blur-2xl opacity-20">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold leading-[1.1] tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-                Make every day<br />a learning<br />journey
-              </h1>
-            </div>
+        {/* Top White Section with Illustration */}
+        <div className="relative flex-1 flex flex-col items-center justify-center px-6 pt-8 md:pt-12 pb-4 z-10">
+          {/* Speech Bubbles Illustration with Fade In */}
+          <div 
+            className="relative w-full max-w-sm md:max-w-md lg:max-w-lg flex items-center justify-center fade-in"
+            style={{ animationDelay: '0.2s' }}
+          >
+            <SpeechBubblesIllustration />
           </div>
+        </div>
 
-          {/* Central Image - Centered and Flexible */}
-          <div className="flex-1 flex items-center justify-center relative w-full my-2 md:my-4 min-h-0">
-            <img 
-              src={onboardImage} 
-              alt="Language Learning Illustration" 
-              className="w-full h-full object-contain max-w-md md:max-w-lg lg:max-w-xl"
-              style={{ maxHeight: '100%' }}
-            />
-          </div>
+        {/* Curved Bottom Section with Gradient - Enhanced */}
+        <div 
+          className="relative flex-shrink-0 w-full px-6 md:px-8 z-10"
+          style={{ 
+            background: 'linear-gradient(135deg, #6366f1 0%, #9333ea 50%, #ec4899 100%)',
+            borderTopLeftRadius: '48px',
+            borderTopRightRadius: '48px',
+            paddingTop: '52px',
+            paddingBottom: '36px',
+            minHeight: '45vh'
+          }}
+        >
+          {/* Decorative Top Border Glow */}
+          <div 
+            className="absolute top-0 left-0 right-0 h-1"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%)',
+            }}
+          ></div>
 
-          {/* Bottom Section - Description and Button */}
-          <div className="flex-shrink-0 flex flex-col items-center w-full">
-            {/* Descriptive Text */}
-            <p className="text-sm md:text-base text-slate-600 dark:text-slate-300 mb-4 md:mb-6 leading-relaxed font-medium text-left w-full">
-              An engaging way to master new languages and connect with cultures worldwide
-            </p>
-
-            {/* CTA Button - Purple Glass Effect 3D */}
-            <button
-              onClick={() => setStep(1)}
-              className="group w-full px-8 py-4 rounded-2xl font-bold text-base md:text-lg shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.9) 0%, rgba(147, 51, 234, 0.9) 50%, rgba(219, 39, 119, 0.9) 100%)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 8px 32px rgba(147, 51, 234, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset, 0 2px 8px rgba(0, 0, 0, 0.1)',
-                transform: 'perspective(1000px) translateZ(0)',
+          {/* Text Content - Enhanced with Animations */}
+          <div className="text-center space-y-2 md:space-y-3 mb-10 md:mb-12">
+            <p 
+              className="text-indigo-200 text-base md:text-lg lg:text-xl font-normal italic fade-in slide-in-from-bottom-4"
+              style={{ 
+                fontFamily: 'Georgia, serif', 
+                fontStyle: 'italic',
+                animationDelay: '0.3s',
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
               }}
             >
-              {/* 3D Effect Overlay */}
+              Let's Break
+            </p>
+            <p 
+              className="text-indigo-100 text-xl md:text-2xl lg:text-3xl font-bold tracking-wider uppercase fade-in slide-in-from-bottom-4"
+              style={{ 
+                animationDelay: '0.4s',
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+              }}
+            >
+              THE BARRIERS OF
+            </p>
+            <h1 
+              className="text-white text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold uppercase tracking-tight leading-tight fade-in slide-in-from-bottom-4"
+              style={{ 
+                animationDelay: '0.5s',
+                textShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              LANGUAGE
+            </h1>
+          </div>
+
+          {/* Enhanced Circular CTA Button */}
+          <div className="flex justify-end pr-2 md:pr-4">
+            <button
+              onClick={() => setStep(1)}
+              className="group w-16 h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative overflow-hidden fade-in"
+              style={{
+                background: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.4)',
+                animationDelay: '0.6s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(245, 158, 11, 0.5), 0 0 0 8px rgba(245, 158, 11, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 158, 11, 0.4)';
+              }}
+            >
+              {/* Animated Ripple Effect */}
               <div 
-                className="absolute inset-0 rounded-2xl opacity-50"
+                className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%)',
-                  transform: 'translateZ(10px)',
+                  background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.4) 0%, transparent 70%)',
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 }}
               ></div>
               
-              {/* Content */}
-              <span className="relative z-10 text-white">Start Learning with TalkEast</span>
-              <ArrowRight className="w-5 h-5 relative z-10 text-white group-hover:translate-x-1 transition-transform" />
-              
-              {/* Hover Glow Effect */}
+              {/* Button Glow on Hover */}
               <div 
-                className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 style={{
                   background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%)',
-                  filter: 'blur(10px)',
+                  filter: 'blur(8px)',
                 }}
               ></div>
+              
+              {/* Enhanced Arrow Icon - Using Lucide Icon */}
+              <ArrowRight 
+                className="w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 text-white relative z-10 transform rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-300" 
+                strokeWidth={3}
+                style={{ 
+                  filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))'
+                }}
+              />
+              
+              {/* Click Ripple Effect */}
+              <div className="absolute inset-0 rounded-full overflow-hidden">
+                <div className="absolute inset-0 bg-white opacity-0 group-active:opacity-30 group-active:animate-ping"></div>
+              </div>
             </button>
           </div>
         </div>
@@ -165,8 +646,19 @@ export default function Onboarding({ onComplete }: Props) {
                 <div
                   key={s}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
-                    step >= s ? 'w-8 bg-indigo-600' : 'w-2 bg-slate-300 dark:bg-slate-700'
+                    step >= s 
+                      ? 'w-8' 
+                      : 'w-2 bg-slate-300 dark:bg-slate-700'
                   }`}
+                  style={
+                    step >= s
+                      ? {
+                          background: 'linear-gradient(90deg, #f59e0b 0%, #f97316 100%)',
+                          boxShadow: '0 0 8px rgba(245, 158, 11, 0.6), 0 0 16px rgba(245, 158, 11, 0.4)',
+                          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        }
+                      : {}
+                  }
                 />
               ))}
             </div>

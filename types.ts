@@ -71,17 +71,25 @@ export interface PronunciationPoint {
   examples: string[];
 }
 
+export interface PracticeExercise {
+  type: string; // 'exercise' | 'drill' | 'usage example' | 'applied task'
+  instruction: string;
+  content: string;
+  answer?: string;
+}
+
 export interface Chapter {
   id: string;
   title: string;
   courseId: string;
   order: number;
   lastAccessed?: number;
-  // Content Sections
-  shortDialogue?: DialogueLine[];
-  longDialogue?: DialogueLine[];
+  // Content Sections (organized in order: Vocabulary → Grammar → Dialogue → Practice)
   vocab: VocabWord[];
   grammar: GrammarPoint[];
+  shortDialogue?: DialogueLine[];
+  longDialogue?: DialogueLine[];
+  practice?: PracticeExercise[];
   culturalTip?: string;
   pronunciationTips?: PronunciationPoint[];
   contentRaw?: string; 

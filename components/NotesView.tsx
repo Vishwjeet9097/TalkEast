@@ -314,15 +314,32 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
     }
   };
 
-  const noteColors = [
+  // Light colors (first row) - Pastel/Soft colors
+  const lightColors = [
     { name: 'Default', value: '', class: 'bg-white dark:bg-slate-800' },
     { name: 'Yellow', value: '#fef3c7', class: 'bg-yellow-100 dark:bg-yellow-900/30' },
     { name: 'Green', value: '#d1fae5', class: 'bg-green-100 dark:bg-green-900/30' },
     { name: 'Blue', value: '#dbeafe', class: 'bg-blue-100 dark:bg-blue-900/30' },
     { name: 'Purple', value: '#e9d5ff', class: 'bg-purple-100 dark:bg-purple-900/30' },
     { name: 'Pink', value: '#fce7f3', class: 'bg-pink-100 dark:bg-pink-900/30' },
-    { name: 'Orange', value: '#fed7aa', class: 'bg-orange-100 dark:bg-orange-900/30' },
   ];
+  
+  // Dark/Vibrant colors (second row) - 60-80% darkness, vibrant tones
+  const darkColors = [
+    { name: 'Vibrant Blue', value: '#3b82f6', class: 'bg-blue-500 dark:bg-blue-600' },
+    { name: 'Vibrant Purple', value: '#a855f7', class: 'bg-purple-500 dark:bg-purple-600' },
+    { name: 'Vibrant Green', value: '#10b981', class: 'bg-green-500 dark:bg-green-600' },
+    { name: 'Vibrant Red', value: '#ef4444', class: 'bg-red-500 dark:bg-red-600' },
+    { name: 'Vibrant Orange', value: '#f97316', class: 'bg-orange-500 dark:bg-orange-600' },
+    { name: 'Vibrant Indigo', value: '#6366f1', class: 'bg-indigo-500 dark:bg-indigo-600' },
+  ];
+  
+  // Combined for finding selected color
+  const noteColors = [...lightColors, ...darkColors];
+  
+  // Split into two rows
+  const firstRowColors = lightColors; // Light colors row
+  const secondRowColors = darkColors; // Dark colors row
 
   // Filter Logic
   const allTags = Array.from(new Set(notes.flatMap(note => note.tags || []))).sort();
@@ -772,8 +789,32 @@ export default function NotesView({ profile }: { profile: UserProfile | null }) 
                                   <Palette size={9} />
                                   <span>Color</span>
                                 </div>
+                                {/* First Row - 6 colors */}
+                                <div className="grid grid-cols-6 gap-1.5 mb-1.5">
+                                  {firstRowColors.map(color => (
+                                    <button
+                                      key={color.value}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        changeColor(note, color.value);
+                                      }}
+                                      className={`relative w-6 h-6 rounded-md transition-all ${
+                                        noteColor === color.value 
+                                          ? 'ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-slate-800 scale-110' 
+                                          : 'hover:scale-110'
+                                      } ${color.class}`}
+                                      style={color.value ? { backgroundColor: color.value } : {}}
+                                      title={color.name}
+                                    >
+                                      {noteColor === color.value && (
+                                        <Check size={8} className="absolute inset-0 m-auto text-white drop-shadow-md" strokeWidth={3} />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                                {/* Second Row - 6 colors */}
                                 <div className="grid grid-cols-6 gap-1.5">
-                                  {noteColors.map(color => (
+                                  {secondRowColors.map(color => (
                                     <button
                                       key={color.value}
                                       onClick={(e) => {

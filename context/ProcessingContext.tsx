@@ -21,11 +21,27 @@ interface ProcessingContextType {
   refreshJobs: () => Promise<void>;
 }
 
-const ProcessingContext = createContext<ProcessingContextType | undefined>(undefined);
+// Default/fallback context value
+const defaultContextValue: ProcessingContextType = {
+  state: 'IDLE',
+  progress: 0,
+  statusMessage: '',
+  error: null,
+  activeTaskName: null,
+  activeJobId: null,
+  startJob: async () => { throw new Error('ProcessingProvider not initialized'); },
+  resumeJob: async () => { throw new Error('ProcessingProvider not initialized'); },
+  pauseJob: async () => { throw new Error('ProcessingProvider not initialized'); },
+  deleteJob: async () => { throw new Error('ProcessingProvider not initialized'); },
+  resetJob: () => {},
+  refreshJobs: async () => {}
+};
+
+const ProcessingContext = createContext<ProcessingContextType>(defaultContextValue);
 
 export const useProcessing = () => {
   const context = useContext(ProcessingContext);
-  if (!context) throw new Error('useProcessing must be used within a ProcessingProvider');
+  // Always return context (will be default if provider not available)
   return context;
 };
 

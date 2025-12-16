@@ -282,6 +282,23 @@
         opacity: 0;
       }
 
+      /* Slide in from bottom animation */
+      @keyframes slide-in-from-bottom {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .slide-in-from-bottom-4 {
+        animation: slide-in-from-bottom 0.7s ease-out forwards;
+        opacity: 0;
+      }
+
       /* Typography System - Standard Font Sizes */
       /* Body text - default for all content */
       .text-body {

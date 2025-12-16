@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { SearchResult, Chapter, DialogueLine, VocabWord, GrammarPoint, PracticeItem, PracticeType, UserProfile } from "../types";
+import { SearchResult, Chapter, DialogueLine, VocabWord, GrammarPoint, PracticeItem, PracticeType, UserProfile, PracticeExercise } from "../types";
 import { PDFPageContent } from "./pdfProcessor";
 
 const ENV_API_KEY = process.env.API_KEY || '';
@@ -62,18 +62,64 @@ export const analyzeContentBatch = async (
     const contentParts = [];
     
     contentParts.push({ 
-        text: `Analyze the following ${pages.length} pages of a language learning textbook (Target: ${targetLang}).
-        
-        CRITICAL RULES FOR CJK (Chinese/Japanese/Korean):
-        1. Preserve full sentences. Do not split sentences mid-way between JSON fields.
-        2. Identify headers accurately (e.g., 第1课, Lesson 1, Chapter 1).
-        3. For Vocabulary tables:
-           - Extract the original characters (Hanzi/Kanji/Hangul) exactly.
-           - Extract Pinyin/Furigana if visible.
-           - Extract the definition.
-        4. If a page is an image, perform OCR to extract the structure.
-        
-        Output a JSON array of 'Chapter' objects found in this batch. If a chapter starts in a previous batch, treat this as a continuation (or new sections).
+        text: `You are an expert curriculum architect and language-learning system designer. Your task is to analyze and reorganize textbook content chapter-by-chapter while STRICTLY preserving the original learning flow and pedagogy.
+
+CRITICAL REQUIREMENTS:
+
+1. CHAPTER IDENTITY:
+   - Each Lesson (chapter) must remain a single, atomic unit.
+   - Do NOT split, merge, rename, or reorder chapters.
+   - A chapter = one official Lesson (e.g., Lesson 1, Lesson 2, 第1课, 第2课).
+   - Sections inside a lesson are internal components, NOT chapters.
+
+2. FOR EACH CHAPTER, ORGANIZE CONTENT INTO EXACTLY THESE COMPONENTS (IN THIS ORDER):
+   a) Vocabulary
+      - Group vocabulary logically (themes if present).
+      - Preserve original order where possible.
+   b) Grammar
+      - List grammar points sequentially as introduced.
+      - Keep dependencies intact (no re-sequencing).
+   c) Dialogue
+      - Include all lesson dialogues.
+      - Preserve speaker roles and conversational context.
+   d) Practice
+      - Exercises, drills, usage examples, and applied tasks.
+      - Do NOT invent new exercises unless clearly marked as "optional".
+
+3. FLOW PRESERVATION (CRITICAL):
+   - The pedagogical progression must remain IDENTICAL to the textbook.
+   - No grammar concept may appear before it is introduced.
+   - Vocabulary must only be used AFTER it is defined.
+   - Dialogues must rely only on previously introduced grammar/vocab.
+
+4. SYSTEM-FRIENDLY OUTPUT:
+   - Output must be structured, consistent, and machine-readable.
+   - Use clear headings and predictable formatting.
+
+5. NON-DISRUPTION RULE:
+   - Do NOT add features, explanations, or creative changes that alter:
+     * Teaching intent
+     * Learning difficulty
+     * Chapter scope
+
+TECHNICAL RULES FOR CJK (Chinese/Japanese/Korean):
+1. Preserve full sentences. Do not split sentences mid-way between JSON fields.
+2. Identify headers accurately (e.g., 第1课, Lesson 1, Chapter 1).
+3. For Vocabulary tables:
+   - Extract the original characters (Hanzi/Kanji/Hangul) exactly.
+   - Extract Pinyin/Furigana if visible.
+   - Extract the definition.
+4. If a page is an image, perform OCR to extract the structure.
+
+OUTPUT FORMAT:
+Output a JSON array of 'Chapter' objects found in this batch. Each chapter must follow the structure:
+- title: Official Lesson Title (e.g., "Lesson 1 - Greetings")
+- vocab: Array of vocabulary words (in order of appearance)
+- grammar: Array of grammar points (in order of introduction)
+- dialogue: Array of dialogue lines (all dialogues from the lesson)
+- practice: Array of practice exercises/examples (if present)
+
+If a chapter starts in a previous batch, treat this as a continuation or new sections.
         ` 
     });
 
@@ -88,62 +134,143 @@ export const analyzeContentBatch = async (
         }
     }
 
-    // Schema Definition
+    // Schema Definition - Structured for Curriculum Architecture
     const responseSchema = {
         type: Type.ARRAY,
         items: {
             type: Type.OBJECT,
             properties: {
-                title: { type: Type.STRING },
-                culturalTip: { type: Type.STRING },
-                shortDialogue: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            speaker: { type: Type.STRING },
-                            text: { type: Type.STRING },
-                            translation: { type: Type.STRING }
-                        }
-                    }
+                title: { 
+                    type: Type.STRING,
+                    description: "Official Lesson Title (e.g., 'Lesson 1 - Greetings', '第1课 - あいさつ')"
                 },
-                longDialogue: {
-                    type: Type.ARRAY,
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            speaker: { type: Type.STRING },
-                            text: { type: Type.STRING },
-                            translation: { type: Type.STRING }
-                        }
-                    }
-                },
+                // 1. Vocabulary (First)
                 vocab: {
                     type: Type.ARRAY,
+                    description: "Vocabulary words in order of appearance, grouped by theme if applicable",
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            word: { type: Type.STRING },
-                            meaning: { type: Type.STRING },
-                            romanization: { type: Type.STRING },
-                            partOfSpeech: { type: Type.STRING },
-                            exampleSentence: { type: Type.STRING }
+                            word: { 
+                                type: Type.STRING,
+                                description: "Original characters (Hanzi/Kanji/Hangul)"
+                            },
+                            meaning: { 
+                                type: Type.STRING,
+                                description: "Meaning in native language"
+                            },
+                            romanization: { 
+                                type: Type.STRING,
+                                description: "Pinyin/Furigana/Romaji if applicable"
+                            },
+                            partOfSpeech: { 
+                                type: Type.STRING,
+                                description: "n., v., adj., etc."
+                            },
+                            exampleSentence: { 
+                                type: Type.STRING,
+                                description: "Example sentence using this word"
+                            },
+                            category: {
+                                type: Type.STRING,
+                                description: "Optional theme/category (e.g., 'Greetings', 'Food')"
+                            }
                         }
                     }
                 },
+                // 2. Grammar (Second)
                 grammar: {
                     type: Type.ARRAY,
+                    description: "Grammar points in order of introduction, preserving dependencies",
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            title: { type: Type.STRING },
-                            explanation: { type: Type.STRING },
-                            example: { type: Type.STRING }
+                            title: { 
+                                type: Type.STRING,
+                                description: "Grammar point name (e.g., 'Particles は/が', 'Verb Conjugation')"
+                            },
+                            structure: {
+                                type: Type.STRING,
+                                description: "Grammar structure/formula"
+                            },
+                            explanation: { 
+                                type: Type.STRING,
+                                description: "Detailed explanation in native language"
+                            },
+                            examples: {
+                                type: Type.ARRAY,
+                                description: "Example sentences with translations",
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        sentence: { type: Type.STRING },
+                                        translation: { type: Type.STRING }
+                                    }
+                                }
+                            }
                         }
                     }
+                },
+                // 3. Dialogue (Third)
+                dialogue: {
+                    type: Type.ARRAY,
+                    description: "All dialogues from the lesson, preserving speaker roles and context",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            speaker: { 
+                                type: Type.STRING,
+                                description: "Speaker name/role"
+                            },
+                            text: { 
+                                type: Type.STRING,
+                                description: "Dialogue text in target language"
+                            },
+                            translation: { 
+                                type: Type.STRING,
+                                description: "Translation in native language"
+                            },
+                            context: {
+                                type: Type.STRING,
+                                description: "Optional context/situation (e.g., 'At a restaurant', 'Meeting someone')"
+                            }
+                        }
+                    }
+                },
+                // 4. Practice (Fourth)
+                practice: {
+                    type: Type.ARRAY,
+                    description: "Practice exercises, drills, usage examples, and applied tasks from the textbook",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            type: {
+                                type: Type.STRING,
+                                description: "Practice type (e.g., 'exercise', 'drill', 'usage example', 'applied task')"
+                            },
+                            instruction: {
+                                type: Type.STRING,
+                                description: "Instruction or question"
+                            },
+                            content: {
+                                type: Type.STRING,
+                                description: "Practice content or example"
+                            },
+                            answer: {
+                                type: Type.STRING,
+                                description: "Answer or solution (if applicable)"
+                            }
+                        }
+                    }
+                },
+                // Optional metadata
+                culturalTip: { 
+                    type: Type.STRING,
+                    description: "Cultural notes if present in the lesson"
                 },
                 pronunciationTips: {
                     type: Type.ARRAY,
+                    description: "Pronunciation tips if present",
                     items: {
                         type: Type.OBJECT,
                         properties: {
@@ -169,33 +296,52 @@ export const analyzeContentBatch = async (
 
         if (response.text) {
              const data = JSON.parse(response.text);
-             // Post-process to ensure IDs and stability
-             return data.map((unit: any, idx: number) => ({
-                id: crypto.randomUUID(),
-                title: unit.title || `Section ${idx + 1}`,
-                courseId: '',
-                order: idx,
-                culturalTip: unit.culturalTip,
-                shortDialogue: unit.shortDialogue || [],
-                longDialogue: unit.longDialogue || [],
-                pronunciationTips: unit.pronunciationTips || [],
-                vocab: (unit.vocab || []).map((v: any) => ({
-                    id: crypto.randomUUID(), 
-                    original: v.word || '?',
-                    reading: v.romanization || '',
-                    meaning: v.meaning || '',
-                    partOfSpeech: v.partOfSpeech,
-                    exampleSentence: v.exampleSentence,
-                    masteryLevel: 0
-                })),
-                grammar: (unit.grammar || []).map((g: any) => ({
+             // Post-process to ensure IDs and stability, preserving structure
+             return data.map((unit: any, idx: number) => {
+                // Combine all dialogues (short + long) into a single dialogue array
+                const allDialogues = [
+                    ...(unit.shortDialogue || []),
+                    ...(unit.longDialogue || []),
+                    ...(unit.dialogue || [])
+                ];
+
+                return {
                     id: crypto.randomUUID(),
-                    title: g.title || 'Grammar Point',
-                    structure: g.title || '',
-                    explanation: g.explanation || '',
-                    examples: g.example ? [{ sentence: g.example, translation: '' }] : []
-                }))
-            }));
+                    title: unit.title || `Lesson ${idx + 1}`,
+                    courseId: '',
+                    order: idx,
+                    culturalTip: unit.culturalTip,
+                    // Store dialogues in both formats for backward compatibility
+                    shortDialogue: allDialogues.length > 0 ? allDialogues : undefined,
+                    longDialogue: undefined,
+                    pronunciationTips: unit.pronunciationTips || [],
+                    // 1. Vocabulary (preserved order)
+                    vocab: (unit.vocab || []).map((v: any) => ({
+                        id: crypto.randomUUID(), 
+                        original: v.word || v.original || '?',
+                        reading: v.romanization || v.reading || '',
+                        meaning: v.meaning || '',
+                        partOfSpeech: v.partOfSpeech,
+                        exampleSentence: v.exampleSentence,
+                        masteryLevel: 0
+                    })),
+                    // 2. Grammar (preserved order and dependencies)
+                    grammar: (unit.grammar || []).map((g: any) => ({
+                        id: crypto.randomUUID(),
+                        title: g.title || 'Grammar Point',
+                        structure: g.structure || g.title || '',
+                        explanation: g.explanation || '',
+                        examples: g.examples || (g.example ? [{ sentence: g.example, translation: '' }] : [])
+                    })),
+                    // 3. Practice (organized exercises from textbook)
+                    practice: (unit.practice || []).map((p: any): PracticeExercise => ({
+                        type: p.type || 'exercise',
+                        instruction: p.instruction || '',
+                        content: p.content || '',
+                        answer: p.answer
+                    }))
+                };
+             });
         }
         return [];
 
