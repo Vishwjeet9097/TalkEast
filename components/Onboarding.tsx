@@ -502,7 +502,8 @@ export default function Onboarding({ onComplete }: Props) {
   // Welcome Page (Step 0) - Enhanced Design
   if (step === 0) {
     return (
-      <div className="fixed inset-0 h-screen w-screen flex flex-col relative overflow-hidden bg-white dark:bg-slate-900" style={{ minHeight: '100vh', height: '100vh' }}>
+      <>
+        <div className="fixed inset-0 h-screen w-screen flex flex-col relative overflow-hidden bg-white dark:bg-slate-900" style={{ height: '100vh', maxHeight: '100vh' }}>
         {/* Subtle Background Pattern */}
         <div className="absolute inset-0 opacity-5 dark:opacity-10 pointer-events-none">
           <div className="absolute top-20 left-10 w-32 h-32 bg-indigo-500 rounded-full blur-3xl"></div>
@@ -510,11 +511,11 @@ export default function Onboarding({ onComplete }: Props) {
         </div>
 
         {/* Top White Section with Illustration */}
-        <div className="relative flex-1 flex flex-col items-center justify-center px-6 pt-8 md:pt-12 pb-4 z-10">
+        <div className="relative flex-1 flex flex-col items-center justify-center px-6 pt-4 pb-2 z-10 overflow-hidden">
           {/* Speech Bubbles Illustration with Fade In */}
           <div 
             className="relative w-full max-w-sm md:max-w-md lg:max-w-lg flex items-center justify-center fade-in"
-            style={{ animationDelay: '0.2s' }}
+            style={{ animationDelay: '0.2s', maxHeight: '100%' }}
           >
             <SpeechBubblesIllustration />
           </div>
@@ -522,14 +523,13 @@ export default function Onboarding({ onComplete }: Props) {
 
         {/* Curved Bottom Section with Gradient - Enhanced */}
         <div 
-          className="relative flex-shrink-0 w-full px-6 md:px-8 z-10"
+          className="relative flex-shrink-0 w-full px-6 md:px-8 z-10 overflow-hidden flex flex-col items-center"
           style={{ 
             background: 'linear-gradient(135deg, #6366f1 0%, #9333ea 50%, #ec4899 100%)',
             borderTopLeftRadius: '48px',
             borderTopRightRadius: '48px',
-            paddingTop: '52px',
-            paddingBottom: '36px',
-            minHeight: '45vh'
+            paddingTop: '40px',
+            paddingBottom: '32px'
           }}
         >
           {/* Decorative Top Border Glow */}
@@ -540,8 +540,14 @@ export default function Onboarding({ onComplete }: Props) {
             }}
           ></div>
 
-          {/* Text Content - Enhanced with Animations */}
-          <div className="text-center space-y-2 md:space-y-3 mb-10 md:mb-12">
+          {/* Background Decorative Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-10 right-10 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+            <div className="absolute bottom-10 left-10 w-24 h-24 bg-white/5 rounded-full blur-xl"></div>
+          </div>
+
+          {/* Main Text Content - Enhanced with Project Focus */}
+          <div className="text-center space-y-2 md:space-y-3 mb-6 md:mb-8 relative z-10 w-full flex flex-col items-center">
             <p 
               className="text-indigo-200 text-base md:text-lg lg:text-xl font-normal italic fade-in slide-in-from-bottom-4"
               style={{ 
@@ -573,58 +579,100 @@ export default function Onboarding({ onComplete }: Props) {
             </h1>
           </div>
 
-          {/* Enhanced Circular CTA Button */}
-          <div className="flex justify-end pr-2 md:pr-4">
-            <button
-              onClick={() => setStep(1)}
-              className="group w-16 h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative overflow-hidden fade-in"
-              style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)',
-                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.4)',
-                animationDelay: '0.6s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 12px 32px rgba(245, 158, 11, 0.5), 0 0 0 8px rgba(245, 158, 11, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 158, 11, 0.4)';
-              }}
-            >
-              {/* Animated Ripple Effect */}
-              <div 
-                className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{
-                  background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.4) 0%, transparent 70%)',
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                }}
-              ></div>
-              
-              {/* Button Glow on Hover */}
-              <div 
-                className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                style={{
-                  background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%)',
-                  filter: 'blur(8px)',
-                }}
-              ></div>
-              
-              {/* Enhanced Arrow Icon - Using Lucide Icon */}
-              <ArrowRight 
-                className="w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 text-white relative z-10 transform rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-300" 
-                strokeWidth={3}
-                style={{ 
-                  filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))'
-                }}
-              />
-              
-              {/* Click Ripple Effect */}
-              <div className="absolute inset-0 rounded-full overflow-hidden">
-                <div className="absolute inset-0 bg-white opacity-0 group-active:opacity-30 group-active:animate-ping"></div>
-              </div>
-            </button>
+          {/* Feature Highlights - Project Specific */}
+          <div className="flex flex-wrap justify-center items-center gap-2 md:gap-3 mb-6 md:mb-8 relative z-10 fade-in w-full" style={{ animationDelay: '0.6s' }}>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+              <BrainCircuit className="w-4 h-4 text-white" />
+              <span className="text-white text-xs md:text-sm font-medium">AI-Powered</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+              <Mic className="w-4 h-4 text-white" />
+              <span className="text-white text-xs md:text-sm font-medium">Voice Practice</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+              <BookOpen className="w-4 h-4 text-white" />
+              <span className="text-white text-xs md:text-sm font-medium">PDF Learning</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+              <Globe className="w-4 h-4 text-white" />
+              <span className="text-white text-xs md:text-sm font-medium">Cultural Connect</span>
+            </div>
           </div>
+
+          {/* Subtitle - Enhanced Messaging */}
+          <p 
+            className="text-center text-indigo-100 text-xs md:text-sm mb-0 px-4 max-w-md leading-relaxed fade-in slide-in-from-bottom-4 relative z-10"
+            style={{ 
+              animationDelay: '0.7s',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              marginLeft: 'auto',
+              marginRight: 'auto'
+            }}
+          >
+            Master Japanese, Korean & Chinese with AI-powered conversations and immersive learning
+          </p>
+
         </div>
-      </div>
+        </div>
+        
+        {/* Floating Navigation Button - Fixed Position at Bottom Right */}
+        <button
+          onClick={() => setStep(1)}
+          className="group rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 relative overflow-hidden fade-in"
+          style={{
+            position: 'fixed',
+            bottom: '1.5rem',
+            right: '1.5rem',
+            width: '4rem',
+            height: '4rem',
+            minWidth: '4rem',
+            minHeight: '4rem',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)',
+            boxShadow: '0 8px 24px rgba(245, 158, 11, 0.4)',
+            animationDelay: '0.8s',
+            zIndex: 100,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 12px 32px rgba(245, 158, 11, 0.5), 0 0 0 8px rgba(245, 158, 11, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 158, 11, 0.4)';
+          }}
+        >
+          {/* Animated Ripple Effect */}
+          <div 
+            className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            style={{
+              background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.4) 0%, transparent 70%)',
+            }}
+          ></div>
+          
+          {/* Button Glow on Hover */}
+          <div 
+            className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%)',
+              filter: 'blur(8px)',
+            }}
+          ></div>
+          
+          {/* Enhanced Arrow Icon - Using Lucide Icon */}
+          <ArrowRight 
+            className="w-6 h-6 text-white relative z-10 transform rotate-45 group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-300" 
+            strokeWidth={3}
+            style={{ 
+              filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2))',
+              width: '1.5rem',
+              height: '1.5rem',
+            }}
+          />
+          
+          {/* Click Ripple Effect */}
+          <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 bg-white opacity-0 group-active:opacity-30 group-active:animate-ping"></div>
+          </div>
+        </button>
+      </>
     );
   }
 
